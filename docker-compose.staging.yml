@@ -1,0 +1,36 @@
+name: the-night-cartographer-an-atlas-of-the-place-staging
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: serve
+    container_name: the-night-cartographer-an-atlas-of-the-place-staging-web
+    # Network-only. The shared proxy reaches this app by container name on
+    # port 80. Never publish a host port on the shared staging host.
+    expose:
+      - "80"
+    environment:
+      # Staging seeds and auto-opens the sample atlas so the differentiator is
+      # visible within a minute with zero input. Production never sets this.
+      SEED_DEMO: "1"
+      UMAMI_URL: "${UMAMI_URL:-}"
+      UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
+      SENTRY_DSN: "${SENTRY_DSN:-}"
+    networks:
+      - default
+      - staging
+    mem_limit: 512m
+    oom_score_adj: 800
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  staging:
+    external: true
+    name: factory-staging-net

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0e1116" />
+    <meta
+      name="description"
+      content="Draw the map of a place you only visit in dreams, pin each morning to it, and touch any place to see everything you wrote there before."
+    />
+    <title>The Night Cartographer</title>
+    <!-- Runtime config is written here at container start (staging) or served
+         as an empty default in dev. Loaded before the app bundle. -->
+    <script src="/config.js"></script>
+    <style>
+      /* Critical inline CSS: the first paint is dark, never white, and shows
+         a real app shell so the page is never blank. */
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #0e1116;
+        color: #e7e2d6;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      #root {
+        min-height: 100vh;
+      }
+      .app-shell {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 20px;
+      }
+      .app-shell__wordmark {
+        font-size: 20px;
+        font-weight: 650;
+        letter-spacing: 0.01em;
+        margin: 8px 0 4px;
+      }
+      .app-shell__tagline {
+        margin: 0 0 24px;
+        font-size: 14px;
+        color: #9a9384;
+      }
+      .app-shell__row {
+        height: 64px;
+        border-radius: 12px;
+        background: #171b22;
+        margin-bottom: 12px;
+        border: 1px solid #232833;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="app-shell" aria-hidden="true">
+        <p class="app-shell__wordmark">The Night Cartographer</p>
+        <p class="app-shell__tagline">An atlas of the places you visit in dreams.</p>
+        <div class="app-shell__row"></div>
+        <div class="app-shell__row"></div>
+        <div class="app-shell__row"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
