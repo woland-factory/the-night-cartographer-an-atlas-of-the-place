@@ -17,6 +17,10 @@
   --touch: 44px;
   --maxw: 720px;
 
+  /* The map is a bright parchment panel inside the dark chrome. */
+  --map-paper: #e8dfc8;
+  --map-ink: #2b2620;
+
   color-scheme: dark;
 }
 
@@ -295,4 +299,174 @@ h2 {
   color: var(--muted);
   font-size: 13px;
   margin: 0 0 var(--space-2);
+}
+
+/* Map editor */
+.map-editor {
+  margin-bottom: var(--space-3);
+}
+
+.map-stage {
+  position: relative;
+}
+
+.map-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--map-paper);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.map-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.map-paper {
+  fill: var(--map-paper);
+}
+
+.map-label {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.reticle circle,
+.reticle line {
+  fill: none;
+  stroke: rgba(43, 38, 32, 0.5);
+  stroke-width: 2;
+}
+
+.map-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-3);
+  pointer-events: none;
+  color: var(--map-ink);
+}
+
+.map-empty__title {
+  font-size: 20px;
+  font-weight: 650;
+  margin: 0 0 var(--space-1);
+}
+
+.map-empty__body {
+  margin: 0 auto var(--space-3);
+  max-width: 28ch;
+  color: #5b5344;
+}
+
+.map-empty .btn {
+  pointer-events: auto;
+}
+
+.map-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.map-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+/* Tool kit */
+.kit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.kit__tools,
+.kit__swatches,
+.kit__stamps,
+.kit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tool {
+  flex: 1 1 auto;
+  min-height: var(--touch);
+  min-width: 72px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.tool:hover {
+  border-color: #33404f;
+}
+
+.tool[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.tool:focus-visible,
+.swatch:focus-visible,
+.stamp:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.swatch,
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch);
+  min-height: var(--touch);
+  padding: 4px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.swatch[aria-pressed="true"],
+.stamp[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.swatch__chip {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.stamp svg {
+  width: 24px;
+  height: 24px;
+}
+
+.kit__actions .btn {
+  flex: 1 1 auto;
 }

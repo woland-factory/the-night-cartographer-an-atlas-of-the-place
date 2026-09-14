@@ -1,5 +1,12 @@
 import { APP_VERSION } from "../version";
-import { ATLAS_FORMAT, CURRENT_VERSION, type AtlasFile, type World } from "../model/atlas";
+import {
+  ATLAS_FORMAT,
+  CURRENT_VERSION,
+  type AtlasFile,
+  type Shape,
+  type Stratum,
+  type World,
+} from "../model/atlas";
 
 // The bundled sample atlas. On staging with SEED_DEMO, a fresh visitor lands
 // inside it and immediately sees a real place answer back: The Harbor
@@ -15,6 +22,104 @@ const HARBOR = "sample-place-harbor";
 const CLOCKMARKET = "sample-place-clockmarket";
 const FOG_STAIR = "sample-place-fog-stair";
 
+const DEMO_STRATUM_ID = "sample-stratum-1";
+
+// One hand-authored, deliberately crooked map revision. The vertices are not
+// tidy on purpose: the shared rendering turns them into a coherent atlas, which
+// is the proof a staging visitor sees. Districts link to the three sample
+// places by placeId; the coordinates live in the canvas 0..1000 space.
+//
+// Exported so the render tests and the showcase fixture use the exact geometry
+// the sample world ships with.
+export function demoShapes(): Shape[] {
+  return [
+    {
+      id: "sample-shape-harbor-district",
+      type: "district",
+      geometry: "160,560 380,600 424,762 296,824 178,742",
+      styleToken: "ink",
+      placeId: HARBOR,
+    },
+    {
+      id: "sample-shape-harbor-label",
+      type: "label",
+      geometry: "292,694",
+      styleToken: "ink",
+      text: "The Harbor",
+    },
+    {
+      id: "sample-shape-clockmarket-district",
+      type: "district",
+      geometry: "214,214 424,196 470,362 300,404 206,338",
+      styleToken: "moss",
+      placeId: CLOCKMARKET,
+    },
+    {
+      id: "sample-shape-clockmarket-label",
+      type: "label",
+      geometry: "324,300",
+      styleToken: "ink",
+      text: "The Clockmarket",
+    },
+    {
+      id: "sample-shape-fogstair-district",
+      type: "district",
+      geometry: "602,182 822,224 838,384 664,402 588,300",
+      styleToken: "plum",
+      placeId: FOG_STAIR,
+    },
+    {
+      id: "sample-shape-fogstair-label",
+      type: "label",
+      geometry: "712,300",
+      styleToken: "ink",
+      text: "The Fog Stair",
+    },
+    {
+      id: "sample-shape-coastline",
+      type: "coastline",
+      geometry: "72,864 232,884 384,838 520,886 668,858 812,880",
+      styleToken: "sea",
+    },
+    {
+      id: "sample-shape-road",
+      type: "road",
+      geometry: "300,636 342,520 300,420 324,360",
+      styleToken: "rust",
+    },
+    {
+      id: "sample-shape-fog-edge",
+      type: "fog",
+      geometry: "556,120 662,86 782,142 884,108",
+      styleToken: "fog",
+    },
+    {
+      id: "sample-shape-stamp-tower",
+      type: "stamp",
+      geometry: "334,262",
+      styleToken: "ink",
+      text: "tower",
+    },
+    {
+      id: "sample-shape-stamp-bridge",
+      type: "stamp",
+      geometry: "452,842",
+      styleToken: "ink",
+      text: "bridge",
+    },
+  ];
+}
+
+function demoStratum(): Stratum {
+  return {
+    id: DEMO_STRATUM_ID,
+    createdAt: "2019-11-02T07:12:00.000Z",
+    label: "first survey",
+    derivedFrom: null,
+    shapes: demoShapes(),
+  };
+}
+
 // Each call returns a fresh copy so callers can mutate freely.
 export function demoWorld(): World {
   return {
@@ -22,8 +127,8 @@ export function demoWorld(): World {
     name: "Harbor City",
     createdAt: "2019-11-02T07:12:00.000Z",
     isSample: true,
-    currentStratumId: null,
-    strata: [],
+    currentStratumId: DEMO_STRATUM_ID,
+    strata: [demoStratum()],
     places: [
       {
         id: HARBOR,

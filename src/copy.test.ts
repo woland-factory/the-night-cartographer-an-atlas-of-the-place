@@ -80,6 +80,10 @@ describe("copy sweep", () => {
     world.name,
     ...world.places.map((p) => p.name),
     ...world.entries.map((e) => e.body),
+    // The seeded showcase map's label shapes are user-visible copy too.
+    ...world.strata.flatMap((s) =>
+      s.shapes.map((shape) => shape.text ?? "").filter(Boolean),
+    ),
   ];
   const allProductStrings = [...uiStrings, ...demoStrings];
 

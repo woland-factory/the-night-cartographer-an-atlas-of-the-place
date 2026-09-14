@@ -47,7 +47,11 @@ describe("world list", () => {
     expect(
       screen.getByRole("button", { name: copy.worldView.back }),
     ).toBeInTheDocument();
-    // A brand-new world has no places yet: a designed state, not a dead end.
-    expect(screen.getByText(copy.worldView.noPlacesTitle)).toBeInTheDocument();
+    // A brand-new world opens straight onto the empty canvas, which leads to
+    // drawing the first district (not a dead end).
+    expect(screen.getByText(copy.map.empty.title)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: copy.map.empty.action }),
+    ).toBeInTheDocument();
   });
 });

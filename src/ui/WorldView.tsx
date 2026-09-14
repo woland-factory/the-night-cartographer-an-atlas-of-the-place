@@ -2,7 +2,8 @@ import { copy } from "../copy";
 import type { Place, World } from "../model/atlas";
 import { elapsedLabel } from "../lib/elapsed";
 import { placeLedger } from "../model/ledger";
-import { closeWorld, openSample } from "../state/atlasStore";
+import { closeWorld } from "../state/atlasStore";
+import { MapCanvas } from "./MapCanvas";
 
 const MONTHS = [
   "January",
@@ -82,21 +83,12 @@ export function WorldView({ world }: { world: World }) {
       </header>
 
       <main>
-        {world.places.length === 0 ? (
-          <section className="empty">
-            <p className="empty__title">{copy.worldView.noPlacesTitle}</p>
-            <p className="empty__body">{copy.worldView.noPlacesBody}</p>
-            {!world.isSample && (
-              <button type="button" className="btn" onClick={openSample}>
-                {copy.worldList.openSample}
-              </button>
-            )}
-          </section>
-        ) : (
+        <MapCanvas world={world} />
+
+        {world.places.length > 0 &&
           world.places.map((place) => (
             <PlaceCard key={place.id} place={place} world={world} />
-          ))
-        )}
+          ))}
       </main>
     </div>
   );

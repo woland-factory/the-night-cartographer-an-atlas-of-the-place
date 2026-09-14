@@ -1,11 +1,19 @@
-# EPIC SPEC — Foundation, the owned file, and the deploy scaffold
+# EPIC SPEC — The map kit (constrained stylized drawing)
 
 *The Night Cartographer: an atlas of the places you only visit in dreams.*
 
-This is EPIC 1 of 7. It lays the foundation the rest of the product is
-built on: the scaffold, the owned atlas file, persistence, a minimal
-world list, a real first render, the staging deploy, and inert
-analytics/error hooks. No map drawing, no accounts, no cloud.
+This EPIC builds the drawing surface: an SVG canvas and a constrained kit
+(labeled district polygons, roads, a coastline tool, text labels, a fixed
+stamp set, and fog/uncertain edges). Stylized rendering makes an amateur's
+crooked lines read as an intentional atlas. Every committed edit appends a
+new stratum (the palimpsest foundation), and naming a district mints a
+durable place. It is fully usable by touch at 390px.
+
+It builds directly on EPIC 1's data model (`src/model/atlas.ts`),
+append-only `Stratum`/`Shape` types, the `atlasStore`, and the existing
+`WorldView`. No schema version bump and no data migration: the `Stratum`
+and `Shape` shapes already validate in `schema.ts`, so this EPIC fills
+them in for real for the first time.
 
 ---
 
@@ -16,498 +24,531 @@ returns everything you wrote there before, with the time since your last
 visit. Paper cannot answer. A dream-journal app has no places to answer
 from. Obsidian answers only if you hand-wired every link yourself.
 
-**What this EPIC owes the differentiator.** There is no map and no
-polished recall panel yet (those are EPICs 2 and 4). But recall lives or
-dies on the foundation this EPIC pours:
+**What this EPIC owes the differentiator.** Recall has nothing to answer
+from until places exist on a map. This EPIC does not build recall (that is
+EPIC 4, and "no recall yet" is a binding non-goal here), but it lays the
+two things recall stands on:
 
-1. **Places are stable identities, and entries index against them.** A
-   `place` keeps its `id` across every future map revision; an `entry`
-   references a `placeId`, never a shape or a coordinate. Recall must
-   still answer after the map has been redrawn ten times. If the data
-   model gets this wrong, recall breaks in EPIC 4 and cannot be patched
-   without a migration.
-2. **The seeded demo already answers back.** On staging with `SEED_DEMO`,
-   a first-time visitor opens the sample world and sees, within a minute
-   and with zero input, a real place that returns its prior dated entries
-   and the time since the last visit. In this EPIC that readout is a
-   plain read-only list, not the signature panel. It must still be real:
-   the demo carries multiple dated entries at one place across years, and
-   the elapsed-time readout is computed and correct.
-
-The signature panel, the on-map tap, the sub-100ms hot path, and the
-guided walkthrough are explicitly later EPICs. This EPIC makes them
-possible and makes the answer honest from day one.
+1. **Every named district mints a durable `place`.** Naming a district
+   creates a `Place` with a stable `id` and an `anchor` point that outlives
+   every future redraw. Recall in EPIC 4 will index entries by that
+   `placeId`. If naming does not create a stable, redraw-proof identity
+   here, recall breaks two EPICs later and cannot be patched without a
+   migration.
+2. **A stranger can put a place on the map inside the first minute.** The
+   empty canvas leads straight to drawing and naming one district, so the
+   first place recall can answer from is reachable fast. Do not add the
+   recall panel, the on-map tap-to-recall, or any elapsed-time readout on
+   the canvas. The EPIC 1 read-only places readout below the map stays
+   exactly as it is.
 
 ---
 
 ## Scope
 
 ### In scope
-- React + Vite + TypeScript project scaffold at the repo root.
-- The atlas data model (TypeScript types) and a documented, human-readable
-  file format: one JSON document with SVG geometry embedded as strings.
-- A persistence layer: IndexedDB for working state, plus File System
-  Access API (FSA) for the owned file, with a download/upload fallback for
-  browsers without FSA. No feature is lost in the fallback.
-- One-click export and import with a lossless round-trip.
-- A minimal world list: create a world, name it, open it. A minimal
-  opened-world view that renders the world's places and, per place, a
-  plain read-only recall readout (its dated entries newest-first and the
-  elapsed time since the last one).
-- A real first render: the app shows real content within ~1s, with no
-  white flash, on first paint.
-- The staging deploy scaffold: a multi-stage `Dockerfile` and
-  `docker-compose.staging.yml` at the repo root, verified to build and
-  serve.
-- The `SEED_DEMO` convention honored by the staging container: a bundled
-  demo atlas that a fresh visitor lands on, auto-opened on staging.
-- Thin, optional analytics (Umami) and error-tracking (Sentry DSN) client
-  hooks that are inert without their env vars and never receive atlas
-  content or PII.
-- A `README.md` a stranger can understand, run, and contribute to.
-- The `ATLAS_FORMAT.md` document describing the file shape.
+- **A map canvas** (`MapCanvas`): a responsive SVG with a fixed coordinate
+  space (viewBox `0 0 1000 1000`), mounted as the primary surface of an
+  opened world, above the existing EPIC 1 places readout.
+- **The constrained kit** (`MapKit`): a fixed set of six tools matching the
+  six `ShapeType`s: `district`, `road`, `coastline`, `label`, `stamp`,
+  `fog`. Single-select. No tool exists outside this set.
+- **Vertex-based drawing** (no raster, no freehand pixels): tap the canvas
+  to drop successive vertices with a live preview; `Finish` commits.
+  Districts close into polygons; roads, coastlines, and fog edges commit as
+  open polylines. Stamps and labels are single-point placements.
+- **A fixed palette**: a small enumerated set of named ink swatches
+  (below). The user may pick one swatch per shape. There is no arbitrary
+  color picker and no `<input type="color">` anywhere.
+- **A fixed stamp set**: an enumerated set of six inline SVG glyphs. No
+  upload, no custom stamps.
+- **Stylized rendering** that turns crooked vertex chains into a coherent
+  atlas: smoothing (Catmull-Rom through the vertices), a shared hand-drawn
+  "ink" SVG filter, a parchment ground, a district hatch/tint fill, a
+  feathered treatment for fog edges, and a map-style label font.
+- **The append-only palimpsest**: each committed edit appends a new
+  `Stratum` that is a full snapshot of the map at that revision. Prior
+  strata are never mutated or deleted. `currentStratumId` points at the
+  newest; `derivedFrom` links to the previous.
+- **District naming → place creation**: finishing a district offers an
+  inline name field. A name creates a `Place` (stable `id`, `anchor` =
+  district centroid) and links the district shape's `placeId`.
+- **Undo**: `Undo point` removes the last uncommitted vertex; `Cancel`
+  discards the in-progress shape; `Undo` reverts the last committed edit by
+  appending a stratum equal to the previous snapshot (palimpsest-safe,
+  never a truncation).
+- **A designed empty-canvas state**: a fresh world's canvas shows a short,
+  positive, product-voice prompt that leads to drawing the first district.
+- **A seeded showcase map on the sample world**: give the demo world one
+  hand-authored, deliberately imperfect stratum whose districts link to its
+  three existing places, plus a coastline, a road, a fog edge, stamps, and
+  labels. This is both the first-run atlas a staging visitor sees and the
+  rendered proof that crooked input reads as a coherent place.
+- **Keyboard operability**: every kit control is keyboard-reachable and
+  labeled; the canvas is focusable with a keyboard point-placement fallback
+  (a reticle moved by arrow keys, `Enter` to place a vertex).
+- Updated `ATLAS_FORMAT.md`, `copy.ts`, and styles; a full copy sweep.
 
 ### Out of scope (non-goals — building any of these is a defect)
-- **No map drawing.** No SVG canvas, no drawing kit, no shape editing UI.
-  The `Shape`/`Stratum` types exist in the model and file format for
-  forward-compatibility, but nothing in this EPIC renders or edits a map.
-- **No accounts, login, or identity.** The atlas is a file.
-- **No cloud, server-side storage, or sync.** The app makes zero network
-  calls for its core loop. The only network the app touches is the
-  optional Umami script and optional Sentry ingestion, both env-gated.
-- **No signature recall panel, no on-map tap, no per-world ledger screen,
-  no write-time recall, no 100ms hot-path budget.** Those are EPIC 4. This
-  EPIC ships only the plain read-only readout described above.
-- **No guided first-run walkthrough.** That is EPIC 6. This EPIC ships the
-  `SEED_DEMO` plumbing and the seed data only.
-- **No time-scrub, no palimpsest UI, no entry composer UI.** Later EPICs.
+- **No time-scrub UI.** Strata are recorded (data only). No slider, no
+  playback, no per-stratum navigation. That is EPIC 5.
+- **No image import as a base map.** No uploading a photo or scan to trace
+  or pin onto. No file input on the canvas.
+- **No recall.** No on-map tap that opens entries, no elapsed-time readout
+  on the canvas, no recall panel, no per-place answer-back at draw time.
+  The EPIC 1 read-only places readout stays unchanged. That surface is
+  EPIC 4.
+- **No entry composer, no pinning entries.** Writing dated entries is
+  EPIC 3. This EPIC creates places, not entries.
+- **No freehand pixel/raster brush, no `<canvas>` raster drawing, no
+  arbitrary color picker, no layers panel.** The kit is constrained by
+  design.
+- **No pan/zoom** on the canvas. The fixed viewBox scales to fit the
+  viewport. Adding pan/zoom is gold-plating and out of scope.
+- **No shape selection/editing UI beyond naming a district and the undo
+  controls above.** No drag-to-move vertices, no per-shape delete panel, no
+  reshape after commit. Redrawing means drawing a new shape in a new
+  stratum. Keep the surface small (this is the plan's highest build risk).
+- **No procedural or automatic map generation, no AI.**
 
 ### The one scope judgment this spec makes (read before building)
-The planner's acceptance criterion for this EPIC requires a fresh visitor
-to "reach the recall moment within a minute." Recall's polished panel
-ships in EPIC 4, so this EPIC delivers the **minimum honest** version: a
-plain, read-only list inside the opened world that shows a place's prior
-entries and the elapsed time since the last one. It is not the signature
-panel and must not grow into it. Do not add on-map interaction, animation,
-a dedicated ledger screen, or a 100ms performance budget here. If you
-find yourself building the map or a polished panel to satisfy this
-criterion, stop: the plain list is the deliverable.
+The sample world currently carries places and entries but no drawn
+geometry, so on the map it would render as blank. This EPIC gives the
+sample **one hand-authored stratum** so a staging visitor sees a real
+hand-drawn atlas and the "crooked reads as intentional" criterion is
+demonstrable on the live app. This is seed geometry only, exactly like
+EPIC 1 seeded entries. It is NOT the EPIC 6 guided walkthrough and must
+not grow into one: no coach marks, no first-success path, no tour. Author
+the stratum's shapes and labels, wire their `placeId`s to the three
+existing sample places, and stop.
 
 ---
 
 ## Technical design
 
-### Stack and dependencies
-- **Vite + React 18 + TypeScript.** Client-only SPA. No backend.
-- **`zod`** for boundary validation of imported files.
-- **`idb`** (Jake Archibald's thin IndexedDB wrapper) for working-state
-  persistence.
-- **`@sentry/browser`** for optional error tracking (init guarded; see
-  below). Umami needs no dependency (script tag).
-- **Testing:** `vitest`, `@testing-library/react`,
-  `@testing-library/jest-dom`, `jsdom`, `fake-indexeddb`.
-- **Tooling:** `eslint` + `typescript-eslint`, `prettier`. Node 20.
+### Coordinate space and the drawing model
+- The canvas is an SVG with `viewBox="0 0 1000 1000"`, `width=100%`, and a
+  fixed aspect (a square that fits the column). Pointer and keyboard
+  positions are mapped from client coordinates into this 0–1000 space using
+  `getScreenCTM().inverse()` (or `getBoundingClientRect` math), so drawing
+  is resolution-independent and identical across viewport sizes.
+- **Geometry is stored as honest vertices, stylized at render time.**
+  `Shape.geometry` holds a space-separated list of `"x,y"` vertices for
+  line/area shapes (`district`, `road`, `coastline`, `fog`) and a single
+  `"x,y"` for point shapes (`stamp`, `label`). The smoothed SVG path is
+  computed by the renderer, never stored. This keeps the file honest and
+  re-stylable and lets EPIC 5 replay strata.
+- `Shape.text` holds the label string for `label` shapes and the glyph id
+  (one of the fixed stamp set) for `stamp` shapes.
+- `Shape.styleToken` holds the chosen palette key (below).
+- `Shape.placeId` is set only on a district shape that has been named.
 
-Do not add state-management libraries, routers with a server, CSS
-frameworks, or a design system. A single small token set (below) is
-enough; EPIC 7 owns polish. Adding more is gold-plating.
+### The fixed palette (no picker)
+Define in `src/model/kit.ts` as a frozen, enumerated array. Starting set
+(the implementer may tune the hex values to the atlas theme, but the set
+stays fixed, enumerated, and swatch-selected — never a picker):
 
-### Files and modules to create
+| token  | role                        | hex (starting) |
+|--------|-----------------------------|----------------|
+| `ink`  | default line / district edge| `#2b2620`      |
+| `sea`  | coastline / water           | `#35617a`      |
+| `moss` | parks, green land           | `#5c6b4a`      |
+| `rust` | roads, paths                | `#9c5b3b`      |
+| `plum` | special districts           | `#6b4a63`      |
+| `fog`  | fog / uncertain edges       | `#8a8577`      |
+
+- Canvas ground is a parchment tone (`--map-paper`, starting `#e8dfc8`) so
+  dark ink reads as a printed atlas. The canvas is a bright parchment panel
+  inside the app's dark chrome; the map is the product's focal surface.
+- Each tool has a sensible default token (`district`→`ink`,
+  `road`→`rust`, `coastline`→`sea`, `label`→`ink`, `stamp`→`ink`,
+  `fog`→`fog`). The swatch row lets the user pick another token for the
+  shape being drawn.
+- Every palette hex must clear WCAG AA contrast against `--map-paper`.
+
+### The fixed stamp set
+Define in `kit.ts` as a frozen array of six glyphs, each an inline
+monoline SVG path drawn in a small local box and placed at the drop point:
+`tower`, `tree`, `bridge`, `mountain`, `well`, `compass`. Exact glyph art
+is the implementer's, but the SET is fixed and enumerated. No upload, no
+custom glyph entry.
+
+### Stylized rendering (the craft — how crooked reads as intentional)
+All of the following ship together; the atlas feel is their combination,
+not any single one. Keep each cheap and deterministic.
+
+1. **Vertex-only geometry.** Points are placed deliberately, so segments
+   are intentional, never a raster scrawl.
+2. **Smoothing.** `smoothPath(points, { closed })` in
+   `src/model/geometry.ts` converts the vertices to a cubic-bezier `d`
+   string via a Catmull-Rom spline (fixed tension). Two points render as a
+   straight line; three or more render as gentle curves. This turns jagged
+   corners into a drawn-by-hand line. It is a pure, deterministic function.
+3. **Shared ink filter.** One SVG `<filter>` in the canvas `<defs>` applies
+   a subtle hand-drawn wobble to strokes (`feTurbulence` with a fixed
+   `seed` + small `feDisplacementMap`, e.g. `baseFrequency ~0.02`,
+   `scale ~2.5`). Fixed seed keeps it deterministic. Applied uniformly so
+   every line looks sketched by the same hand.
+4. **District fill.** A translucent parchment tint or a faint hatch
+   `<pattern>` so districts read as areas, not just outlines.
+5. **Coastline.** A slightly heavier smoothed stroke in `sea`. No water
+   fill (which side is sea is ambiguous and out of scope).
+6. **Fog edges.** Rendered feathered and uncertain: reduced opacity, a
+   dashed stroke, and a light blur (`feGaussianBlur`) so the boundary reads
+   as half-remembered, honoring the plan's "false precision" risk.
+7. **Labels.** A serif or map-style font, centered on the anchor point,
+   with subtle letter-spacing.
+8. **Stamps.** The fixed glyph, ink-colored, centered on the drop point.
+
+Keep the `shape → SVG` mapping in a pure module (`src/ui/mapRender.ts` or
+equivalent) so it is snapshot-testable and deterministic.
+
+### The strata engine (append-only, immutable prior revisions)
+Pure helpers in `src/model/strata.ts` (or added to `factory.ts`), each
+taking a `World` and returning a NEW `World` with an appended stratum,
+never mutating the input or any prior stratum:
+
+- `currentShapes(world): Shape[]` — the shapes of the stratum whose id is
+  `currentStratumId`, or `[]` when there is none.
+- `snapshotWith(world, nextShapes): World` — append a `Stratum` whose
+  `shapes = nextShapes`, `derivedFrom = world.currentStratumId`, set
+  `currentStratumId` to the new id. Prior strata are copied by reference,
+  never edited.
+- `commitShape(world, shape): World` — `snapshotWith(world,
+  [...currentShapes(world), shape])`.
+- `undoLastEdit(world): World` — append a stratum whose `shapes` equal the
+  snapshot *before* the current one (the `derivedFrom` chain), or `[]` if
+  the current stratum is the first. This is a new revision, not a deletion.
+
+Invariant tests must prove that after any of these, every previously
+existing `Stratum` object is deep-equal to a clone captured before the
+call (nothing prior mutated), and `strata.length` increased by exactly one.
+
+### District naming → place creation
+- Finishing a district shows an inline name field (labeled, keyboard
+  reachable). Entering a name and confirming:
+  1. Creates a `Place` via `createPlace(name, centroid)` where
+     `centroid = polygonCentroid(points)` (a stable `Point`, so the place's
+     location survives redraws that give the district new shape ids).
+  2. Sets the committed district shape's `placeId` to that place id.
+  3. Adds the place to `world.places`.
+  For a freshly drawn district this happens in the same commit, so the
+  common path is one stratum: the district shape (with `placeId`) plus the
+  new place, in one appended snapshot.
+- Skipping the name commits an unnamed district (a valid shape, no place).
+- Naming a previously committed district later is allowed and appends a new
+  stratum carrying a `placeId`-updated copy of that district shape; the
+  place is added to `world.places`. Prior strata keep the unnamed copy.
+- **Places live at `world.places`, never inside strata**, so a place's `id`
+  and `anchor` are already independent of any stratum. Redrawing the map
+  (new strata, new shape ids) never touches `world.places`. This is the
+  redraw-proof identity recall depends on.
+
+### Store mutations (`src/state/atlasStore.ts`)
+Add, mirroring the existing `set(...)` immutable-update pattern (each
+produces a new atlas object and schedules the debounced autosave):
+- `commitShape(worldId, shape)` — replace the world with
+  `commitShape(world, shape)`.
+- `nameDistrict(worldId, shapeId, name)` — create the place, set the
+  shape's `placeId`, append the stratum, add the place. When called as part
+  of a fresh district finish, prefer a single combined commit path so only
+  one stratum is appended.
+- `undoLastEdit(worldId)` — replace the world with `undoLastEdit(world)`.
+
+Draw-tool selection, in-progress vertices, and the reticle position are
+**local component state** in `MapCanvas`, never in the store (they are
+transient and must never persist or append a stratum until `Finish`).
+
+### Boundary safety (security hygiene for a local, no-network app)
+There are no server routes. The boundaries are user input into shapes and
+the import path:
+- Cap label text length (for example 80 chars) and vertex count per shape
+  (for example 200) at creation time in the kit/factory. Reject or trim
+  beyond the cap so pathological input cannot bloat a stratum.
+- Render all label text and district names through React text nodes (auto
+  escaped). Never use `dangerouslySetInnerHTML`. Geometry is only ever set
+  as the `d` attribute of a `<path>` or `x/y` of `<text>`/`<use>`; SVG path
+  data cannot execute script.
+- Tighten `schema.ts` optionally with the same caps (max string lengths,
+  max array sizes) so an imported file with absurd shapes is rejected with
+  the existing friendly "unreadable" reason rather than accepted.
+- No PII, no atlas content, and no label/geometry text is ever logged.
+
+### UI composition (`src/ui/WorldView.tsx`)
+An opened world renders, top to bottom:
+1. The existing back toolbar and world heading (unchanged).
+2. **`MapCanvas`** (primary surface): the parchment SVG rendering
+   `currentShapes(world)`. When there are no shapes, it shows the designed
+   empty-canvas state (below) as the screen's single primary call to
+   action.
+3. **`MapKit`** (the tool palette): a bottom, thumb-reachable toolbar with
+   the six tools (single-select segmented control), the swatch row, the
+   stamp picker (shown when the stamp tool is active), and the contextual
+   controls `Finish` / `Undo point` / `Cancel` while a shape is in
+   progress, plus `Undo` for the last committed edit.
+4. **The EPIC 1 places readout** (unchanged) — *only when the world has at
+   least one place*. When a world has no places yet, do not render the old
+   places-readout empty block; the canvas empty state is the single leading
+   action (QUALITY BAR §7, one primary action per screen). New named
+   districts appear here automatically as places with the existing
+   "Pin your first morning here." line (no entries yet). Do not add recall
+   or elapsed time to the canvas.
+
+### Mobile-first and one primary action (QUALITY BAR §2, §7)
+- Single column, usable at 390px, no horizontal scroll. The canvas scales
+  to the column width; the kit toolbar wraps within the viewport.
+- Every kit control has `min-height: 44px` and comfortable touch spacing.
+- One primary action at a time: while a shape is in progress the primary
+  button is `Finish`; otherwise the selected tool is the highlighted
+  single-select state and the empty-state CTA is the only primary. Tool
+  buttons are a subordinate segmented control, not six competing primaries.
+
+### Accessibility (QUALITY BAR §6)
+- Every kit button, swatch, and stamp is a real `<button>` with an
+  accessible name (visible label or `aria-label`), a visible focus state,
+  and AA contrast.
+- The name field is a labeled `<input>`.
+- The canvas is focusable (`tabindex=0`) with an `aria-label` and a short
+  keyboard hint, and supports a **keyboard point-placement fallback**: with
+  a line/area tool active and the canvas focused, arrow keys move a visible
+  reticle in coarse steps (for example 20 units, larger with `Shift`),
+  `Enter` places a vertex at the reticle, and the `Finish` button (already
+  keyboard-reachable) commits. This makes every drawing action reachable
+  without a pointer, satisfying "keyboard reaches everything a mouse can."
+  Exact-pixel freehand placement is pointer-native and is not required.
+
+### Perceived speed (QUALITY BAR §1)
+- Vertex placement, reticle motion, tool/swatch selection, and preview are
+  local React state and update within one frame (well under 100ms).
+- Commit is synchronous into the store (optimistic); autosave stays the
+  existing 500ms debounce.
+- Rendering reads only `currentShapes(world)` (one stratum), so map render
+  cost is bounded by the current shape count and is **independent of edit
+  history length**. Strata history grows the file but never the hot render
+  path. Note in code and README that the palimpsest's growth is the
+  product's durable value, not a leak.
+
+### Designed empty-canvas state (QUALITY BAR §3, §4)
+When `currentShapes(world)` is empty, the canvas center shows a short,
+positive prompt in the product's voice with a single call to action that
+selects the district tool. Pre-swept copy in `copy.ts`:
+- title: `"Draw your first district."`
+- body: `"Pick a shape, then tap the map to place each corner."`
+- action: `"Start a district"` (selects the district tool).
+
+### Copy (all new strings in `src/copy.ts`, pre-swept and safe to ship)
+Add a `map` section. Positive, short, no em-dashes, no banned vocabulary,
+no negative empty-state phrasing:
+- Tool labels: `"District"`, `"Road"`, `"Coastline"`, `"Label"`,
+  `"Stamp"`, `"Fog edge"`.
+- In-progress: `"Finish"`, `"Undo point"`, `"Cancel"`.
+- Committed-edit undo: `"Undo"`.
+- District name: field label `"District name"`, placeholder
+  `"The Harbor"`, confirm `"Name it"`, skip `"Skip"`.
+- Group labels (aria): kit `"Map tools"`, swatches `"Ink color"`, stamps
+  `"Stamps"`.
+- Canvas: `aria-label` `"Map canvas. Pick a tool, then place points to
+  draw."` and a short keyboard hint such as `"Arrow keys move the marker.
+  Enter places a point."`
+- Empty-canvas title/body/action as above.
+Sweep these plus the demo shape labels (below) mechanically before
+finishing.
+
+### The seeded showcase stratum (`src/data/demoAtlas.ts`)
+Give `demoWorld()` one stratum (set `currentStratumId` to its id) whose
+shapes are deliberately hand-crooked yet read as a coherent place:
+- A district polygon per existing sample place, each linked by `placeId` to
+  `sample-place-harbor`, `sample-place-clockmarket`, and
+  `sample-place-fog-stair`, with a matching `label` shape.
+- A `coastline` near The Harbor (token `sea`), a `road` linking two
+  districts (token `rust`), a `fog` edge by The Fog Stair (token `fog`),
+  and one or two `stamp`s (for example `tower`, `bridge`).
+- Fixed ids and fixed vertex coordinates (deterministic; no runtime
+  randomness). Deliberately imperfect vertices so the render proves the
+  stylization. All label text pre-swept.
+This stratum doubles as the "crooked amateur test map" the render tests and
+the required screenshot artifact use. Adding it must not break EPIC 1 tests
+(entries and recall readout are unchanged; the round-trip fixture is
+separate).
+
+### ATLAS_FORMAT.md update
+Update the `Shape` and `Stratum` sections to document what EPIC 2 actually
+writes: `geometry` as space-separated `"x,y"` vertices for line/area
+shapes and a single `"x,y"` for point shapes; `text` as the label string
+for `label` and the glyph id for `stamp`; `styleToken` as one of the fixed
+palette keys; `placeId` set on named districts; and that editing appends a
+new stratum (full snapshot) while prior strata are immutable. No version
+bump (no shapes existed in any prior file).
+
+### Files to create / touch
 ```
-/Dockerfile                       multi-stage: node build -> nginx serve
-/docker-compose.staging.yml       builds target `serve`, maps 8080:80, sets SEED_DEMO
-/nginx.conf                        SPA fallback (try_files ... /index.html), gzip, cache
-/docker/entrypoint.sh             writes /usr/share/nginx/html/config.js from env at start
-/ATLAS_FORMAT.md                  the documented file format
-/README.md                        rewrite: understand / run / contribute
-/index.html                       inline app-shell + inline critical CSS (no white flash)
-/public/config.js                 dev default: window.__NC_CONFIG__ = {} (empty)
-/package.json, /tsconfig.json, /vite.config.ts, /vitest.config.ts
-
-/src/main.tsx                     mounts React; reads runtime config; inits hooks; seeds
-/src/config.ts                    reads window.__NC_CONFIG__ with safe empty defaults
-/src/copy.ts                      ALL user-visible strings, centralized (enables the sweep)
-/src/model/atlas.ts              TypeScript types for the atlas (below)
-/src/model/factory.ts            createAtlas(), createWorld(name), createPlace(), etc.
-/src/model/schema.ts             zod schema for AtlasFile + validate()/parseAtlas()
-/src/model/migrate.ts            forward-only migration framework (v1 identity today)
-/src/model/serialize.ts         serialize(atlas) -> string, parse(string) -> AtlasFile
-/src/model/ledger.ts            derived per-place ledger (count, lastVisit) from entries
-/src/lib/elapsed.ts             elapsedLabel(fromISO, nowISO) -> "14 months ago"
-/src/persistence/idb.ts         load/save working atlas in IndexedDB (debounced save)
-/src/persistence/file.ts        exportAtlas()/importAtlas(): FSA when present, else fallback
-/src/data/demoAtlas.ts          the bundled SEED_DEMO sample atlas
-/src/state/atlasStore.ts        in-memory atlas + subscribe; the single source of truth
-/src/ui/App.tsx                 routes between world list and opened world (no server router)
-/src/ui/WorldList.tsx           create/name/open worlds; empty state; export/import controls
-/src/ui/WorldView.tsx           opened world: places + read-only recall readout
-/src/ui/ErrorBoundary.tsx       designed error state
-/src/ui/tokens.css              minimal token set (colors, spacing, radius, touch size)
+src/model/geometry.ts     NEW  smoothPath, polygonCentroid, points<->string
+src/model/kit.ts          NEW  TOOLS, PALETTE, STAMPS, defaults, caps (all frozen)
+src/model/strata.ts       NEW  currentShapes, snapshotWith, commitShape, undoLastEdit
+src/state/atlasStore.ts   EDIT commitShape/nameDistrict/undoLastEdit mutations
+src/ui/mapRender.ts       NEW  pure Shape -> SVG props (path d, class, token->color)
+src/ui/MapCanvas.tsx      NEW  SVG canvas, defs (filters/patterns/glyphs), tap+keyboard
+src/ui/MapKit.tsx         NEW  tool palette, swatches, stamp picker, finish/undo/cancel
+src/ui/WorldView.tsx      EDIT mount MapCanvas+MapKit; gate the old readout on places>0
+src/ui/tokens.css         EDIT map palette tokens, parchment canvas, kit toolbar styles
+src/copy.ts               EDIT the map section (strings above)
+src/data/demoAtlas.ts     EDIT add the seeded showcase stratum
+src/model/schema.ts       EDIT optional caps (max string/array sizes)
+ATLAS_FORMAT.md           EDIT document geometry/text/styleToken/placeId conventions
+src/test/fixtures.ts      EDIT the crooked showcase fixture (reuse demo stratum)
 ```
-
-### The atlas data model
-Matches the plan's data model sketch. These types are the file format
-plus the working state.
-
-```ts
-// src/model/atlas.ts
-export interface AtlasFile {
-  format: "night-cartographer-atlas"; // fixed discriminator
-  version: 1;                          // schema version; migrations bump this
-  meta: { createdAt: string; appVersion: string }; // ISO 8601; semver string
-  settings: { activeWorldId: string | null };
-  worlds: World[];
-}
-
-export interface World {
-  id: string;                 // crypto.randomUUID()
-  name: string;
-  createdAt: string;          // ISO 8601
-  isSample?: boolean;         // true only for the seeded demo world
-  places: Place[];
-  strata: Stratum[];          // append-only map revisions (no UI this EPIC)
-  currentStratumId: string | null;
-  entries: Entry[];
-}
-
-export interface Place {      // the stable identity recall indexes against
-  id: string;
-  name: string;
-  anchor: Point | { shapeRef: string } | null;
-  createdAt: string;
-}
-export interface Point { x: number; y: number }
-
-export interface Stratum {    // one dated map revision, append-only
-  id: string;
-  createdAt: string;
-  label?: string;
-  shapes: Shape[];
-  derivedFrom?: string | null;
-}
-
-export interface Shape {
-  id: string;
-  type: "district" | "road" | "coastline" | "label" | "stamp" | "fog";
-  geometry: string;           // SVG path 'd' string, or serialized points
-  styleToken: string;         // key into a fixed palette (defined in EPIC 2)
-  text?: string;
-  placeId?: string;           // links a district shape to a place
-}
-
-export interface Entry {
-  id: string;
-  placeId: string;            // recall indexes entries by this
-  date: string;               // the dream's date, YYYY-MM-DD
-  body: string;
-  createdAt: string;          // ISO 8601 timestamp
-}
-```
-
-**Ledger is derived, never stored.** `src/model/ledger.ts` computes, per
-`placeId`: entry count and the most recent entry `date`. The read-only
-readout and (later) the recall panel consume this. Never persist it.
-
-### File format and round-trip
-- **Serialize:** `serialize(atlas)` returns pretty-printed JSON
-  (2-space indent, stable key order) so the file is human-readable and
-  diff-friendly. SVG geometry lives inside `Shape.geometry` as a string,
-  so the whole atlas is one file that outlives the tool.
-- **Parse + validate:** `parseAtlas(text)` runs `JSON.parse`, then the
-  `zod` schema (`schema.ts`), then `migrate()` (`migrate.ts`). It returns
-  either `{ ok: true, atlas }` or `{ ok: false, reason }` with a
-  human-readable reason. Never throw a raw parse error at the UI.
-- **Round-trip guarantee:** `parseAtlas(serialize(atlas)).atlas` deep-
-  equals `atlas` for any valid atlas. This is the load-bearing test.
-- **Migrations are forward-only.** `migrate(file)` switches on
-  `file.version`, applying each step in order up to `CURRENT_VERSION`
-  (`1` today, so it is identity). Later EPICs add cases; old files must
-  always upgrade, never break. An unknown/newer version returns a clear
-  `{ ok: false, reason }` (do not silently corrupt).
-
-### Persistence layer
-- **Working state (IndexedDB):** one object store (e.g. `atlas`) holding
-  the single working `AtlasFile` under a fixed key. `atlasStore` autosaves
-  on change, debounced (~500ms), through `idb.ts`. On load, the app reads
-  IndexedDB first.
-- **The owned file (FSA):** feature-detect `window.showSaveFilePicker` /
-  `showOpenFilePicker`. When present, "Save to file" writes the serialized
-  atlas straight to a user-chosen `.json` file and retains the handle so a
-  later save writes back to the same file. Suggested filename:
-  `<world-or-atlas-name>.atlas.json`.
-- **Fallback (no FSA):** "Export" builds a `Blob` and triggers a download
-  via an `<a download>`; "Import" reads a file via `<input type="file">`
-  and `File.text()`. Feature parity: the user can still get their atlas
-  out and back in, they lose only the direct-to-same-file convenience.
-- **Detection is runtime, not build-time.** Both code paths ship; the UI
-  picks based on capability. Label the FSA action and the fallback action
-  the same way to the user where possible so the feature reads identically.
-
-### Runtime config (env at deploy time, not baked into the build)
-Because this is a static SPA, env arrives at container start, not build
-time. The nginx entrypoint writes `config.js` from environment variables;
-`index.html` loads it before the app bundle.
-
-```
-window.__NC_CONFIG__ = {
-  SEED_DEMO: "1" | "",           // truthy -> seed + auto-open demo on empty state
-  UMAMI_URL: "" ,                // Umami script endpoint
-  UMAMI_WEBSITE_ID: "" ,         // per-app id injected by the factory
-  SENTRY_DSN: ""                 // per-app DSN injected at deploy time
-};
-```
-`src/config.ts` reads `window.__NC_CONFIG__ ?? {}` and returns typed
-values with empty defaults. `public/config.js` sets `{}` so dev and tests
-have a real (empty) config and no 404.
-
-### Analytics and error hooks (inert without env; never see atlas content)
-- **Umami:** if BOTH `UMAMI_URL` and `UMAMI_WEBSITE_ID` are non-empty,
-  inject `<script defer src={UMAMI_URL} data-website-id={UMAMI_WEBSITE_ID}>`
-  once. Use only Umami's automatic pageview. Never call a custom event
-  carrying atlas text, place names, or entry bodies. If either value is
-  empty, inject nothing.
-- **Sentry:** if `SENTRY_DSN` is non-empty, `Sentry.init({ dsn,
-  sendDefaultPii: false, beforeSend })`. `beforeSend` strips anything that
-  could carry atlas content: drop `event.request`, clear `event.breadcrumbs`
-  (or filter to non-data breadcrumbs), and cap message length. Expose one
-  thin wrapper `reportError(error: Error)` used by `ErrorBoundary`. The
-  wrapper's signature takes an `Error` only, so no code path can hand
-  Sentry an entry body. If `SENTRY_DSN` is empty, `reportError` is a no-op
-  and `Sentry.init` is never called.
-- **No PII anywhere.** There is no user identity in this product. Never
-  log entry text, place names, or file contents to console or to any hook.
-
-### First render (no white flash)
-- Set `html, body` background to the app's dark background color in
-  `index.html`'s inline CSS so the very first paint is never white.
-- `index.html` contains an inline **app shell**: the product wordmark and
-  a static skeleton of the world list, styled with inline critical CSS.
-  React mounts into `#root` and replaces the shell once IndexedDB (or the
-  seed) resolves. On an ordinary connection the user sees real content
-  (the world list, or the seeded demo world) within ~1s and never a blank
-  page.
-
-### Minimal UI (this EPIC only)
-- **World list (home):** worlds as cards or rows; each opens on tap. A
-  "New world" primary action opens an inline name field and creates the
-  world. An "Open the sample atlas" action loads the demo. Export / Import
-  / Save to file controls live here (a small Settings area is acceptable,
-  but keep it to these actions). Designed empty state (copy below).
-- **Opened world (WorldView):** the world name, its list of places, and
-  per place the plain read-only readout: entries newest-first with their
-  dates, and one elapsed-time line (`elapsedLabel`). A place with no
-  entries shows a short designed line inviting the first entry (no dead
-  end, no "0 results"). No map, no composer, no panel animation.
-- **Mobile-first:** single column, usable at 390px, no horizontal scroll,
-  touch targets ~44px min-height, text readable without zoom.
-- **Accessibility:** semantic headings, one labeled `<input>` for the
-  world name, visible focus states, keyboard reaches every control,
-  sufficient contrast.
-- **Copy:** every user-visible string lives in `src/copy.ts`. Positive,
-  short, no em-dashes, no banned vocabulary. Example strings below are
-  pre-swept; use them or equally clean ones.
-
-### Example copy (pre-swept — safe to ship verbatim)
-- World list empty state (title / body / action):
-  "Start your first atlas." / "Draw a world you return to, then pin what
-  you remember." / button "New world".
-- Sample entry point: "Open the sample atlas".
-- Opened world, a place with history: "Last visit here: 14 months ago".
-- Opened world, a place with no entries yet: "Pin your first morning here."
-- Import failure: "That file isn't an atlas we can read. Pick another."
-- Error boundary (title / action): "Reload to try again." / button
-  "Reload".
-- Save-to-file / Export button: "Save to file". Import button: "Open a
-  file".
-
-### The seeded demo atlas (`src/data/demoAtlas.ts`)
-- One world, `isSample: true`, named plainly (for example "Harbor City").
-- At least two places, one of them ("The Harbor") carrying **multiple
-  dated entries across several years** so recall demonstrably answers back.
-  A demo whose recall readout is empty does not count.
-- Entry `date`s are fixed ISO dates spanning a few years, with the most
-  recent roughly a year or so back, so `elapsedLabel` returns a real,
-  plausible line like "Last visit here: 14 months ago" computed at
-  runtime. Do not hardcode the elapsed string.
-- Entry bodies are short, plain, dream-like, and pass the copy sweep.
-- The world is clearly a sample (the `isSample` flag; surface it in the UI
-  as a small "Sample" marker). It must never silently become the user's
-  own saved file: seeding writes to working state only when IndexedDB is
-  empty, and the app makes starting a real atlas one obvious action away.
-  (The full "one tap in production, never overwrite" guarantee and the
-  guided path are EPIC 6; here, do not overwrite a non-empty IndexedDB.)
-
-### Seeding behavior
-- On startup: read IndexedDB. If a saved atlas exists, use it (never
-  overwrite it with the demo).
-- If IndexedDB is empty AND `SEED_DEMO` is truthy: load `demoAtlas` into
-  working state and set `settings.activeWorldId` to the demo world so the
-  visitor lands inside it (the readout is immediately visible).
-- If IndexedDB is empty AND `SEED_DEMO` is falsy: render the world list
-  empty state (designed, not blank), which offers both "New world" and
-  "Open the sample atlas".
-
-### Docker / staging
-- **Dockerfile (multi-stage):** stage `build` on `node:20-alpine` runs
-  `npm ci && npm run build`; stage `serve` on `nginx:1.27-alpine` copies
-  `dist` to `/usr/share/nginx/html`, copies `nginx.conf`, and installs
-  `docker/entrypoint.sh` into `/docker-entrypoint.d/40-write-config.sh`
-  (must be executable; the official nginx image runs these at start).
-- **entrypoint.sh:** writes `config.js` from `SEED_DEMO`, `UMAMI_URL`,
-  `UMAMI_WEBSITE_ID`, `SENTRY_DSN` (empty defaults). This keeps env at
-  deploy time and out of the build.
-- **nginx.conf:** SPA fallback `try_files $uri /index.html;`, gzip on,
-  sensible cache headers for hashed assets, `config.js` served
-  `no-cache`.
-- **docker-compose.staging.yml:** one `web` service, `build.target:
-  serve`, `ports: ["8080:80"]`, `environment: { SEED_DEMO: "1" }`
-  (Umami/Sentry left unset so the hooks stay inert unless the deploy sets
-  them), a healthcheck hitting `/`.
 
 ---
 
-## Ordered task list (each item is independently checkable)
+## Ordered task list (each item independently checkable)
 
-1. **Scaffold.** Vite + React + TS project at repo root; scripts `dev`,
-   `build`, `preview`, `test`, `lint`. `tsconfig` strict. App boots to a
-   placeholder. *AC:* `npm run build` succeeds; `npm run dev` serves.
+1. **Geometry + kit definitions (pure).** `geometry.ts`
+   (`smoothPath(points,{closed})` → cubic-bezier `d`, `polygonCentroid`,
+   `pointsToString`/`stringToPoints`); `kit.ts` (frozen `TOOLS`, `PALETTE`,
+   `STAMPS`, per-tool defaults, label/vertex caps).
+   *AC:* `smoothPath` is deterministic (equal input → identical output) and
+   emits curve commands for ≥3 points and a straight line for 2; the
+   palette and stamp set are frozen enumerations; two crooked point sets
+   round-trip through `pointsToString`/`stringToPoints` exactly.
 
-2. **Tokens + app shell + first render.** `index.html` with inline dark
-   background, inline app-shell wordmark and world-list skeleton;
-   `tokens.css`; React mounts into `#root`. *AC:* first paint shows the
-   shell (no white flash); after mount, real content shows within ~1s.
+2. **Strata engine (pure, append-only).** `strata.ts` with `currentShapes`,
+   `snapshotWith`, `commitShape`, `undoLastEdit`.
+   *AC:* `commitShape` and `undoLastEdit` each increase `strata.length` by
+   exactly one, advance `currentStratumId`, set `derivedFrom` to the prior
+   id, and leave every prior `Stratum` deep-equal to a pre-captured clone
+   (no mutation, no deletion). `undoLastEdit` restores the previous
+   snapshot as a new stratum.
 
-3. **Data model + factories.** `atlas.ts` types; `factory.ts`
-   constructors using `crypto.randomUUID()` and ISO timestamps. *AC:*
-   `createAtlas()` and `createWorld(name)` produce well-formed objects.
+3. **Store mutations.** `commitShape`, `nameDistrict`, `undoLastEdit` in
+   `atlasStore.ts` using the pure engine and the existing immutable `set`.
+   *AC:* calling each produces a new atlas object, emits to subscribers, and
+   schedules autosave; `nameDistrict` adds a `Place` to `world.places` and
+   links the district's `placeId`; a fresh district finish appends exactly
+   one stratum.
 
-4. **Serialize + schema + migrate + round-trip.** `serialize.ts`,
-   `schema.ts` (zod), `migrate.ts` (v1 identity). *AC:*
-   `parseAtlas(serialize(atlas)).atlas` deep-equals `atlas`; malformed
-   input returns `{ ok: false, reason }`; a `version` newer than
-   `CURRENT_VERSION` is rejected cleanly.
+4. **Map renderer + defs (pure + deterministic).** `mapRender.ts` mapping a
+   `Shape` to SVG props; canvas `<defs>` with the shared ink filter, the
+   district fill pattern, the fog blur, and the six stamp glyphs.
+   *AC:* rendering the crooked showcase fixture is deterministic and, in a
+   snapshot, uses only palette tokens, applies smoothing (curve commands,
+   not only `L`), references the ink filter, and gives fog shapes the
+   feathered treatment (dashed + reduced opacity + blur).
 
-5. **IndexedDB persistence + store.** `idb.ts` load/save; `atlasStore.ts`
-   in-memory source of truth with subscribe and debounced autosave. *AC:*
-   saving then reloading the store restores the atlas exactly (tested with
-   `fake-indexeddb`).
+5. **MapCanvas component.** Renders `currentShapes`, handles canvas taps to
+   drop vertices (line/area) or a single point (stamp/label) with a live
+   preview, the keyboard reticle fallback, and the designed empty state.
+   *AC:* selecting a tool and tapping places vertices with a visible
+   preview; `Finish` commits the right `ShapeType`; a stamp tap drops the
+   chosen glyph; a label tap opens the text field and commits a label; a
+   fresh world shows the empty-canvas copy; the canvas is focusable and
+   arrow+`Enter` places a vertex.
 
-6. **Export/import (FSA + fallback).** `file.ts` with runtime detection.
-   *AC:* with FSA mocked present, save writes serialized atlas and retains
-   the handle; with FSA absent, export produces a Blob download and import
-   reads a File; both round-trip losslessly; a bad import surfaces the
-   friendly reason, never a raw throw.
+6. **MapKit toolbar.** The six tools (single-select), swatch row, stamp
+   picker, contextual `Finish`/`Undo point`/`Cancel`, and `Undo`.
+   Mobile-first, ~44px targets, one primary action.
+   *AC:* the DOM contains no `<input type="color">`, no raster `<canvas>`,
+   no file input, and no layers-panel control; swatches render exactly the
+   fixed palette count and stamps exactly the fixed set; every kit button is
+   ≥44px and keyboard-reachable with a visible focus state; only one primary
+   control is present at a time.
 
-7. **Ledger + elapsed util.** `ledger.ts` derives per-place count and last
-   visit; `elapsed.ts` formats human elapsed time. *AC:* ledger matches
-   entries; `elapsedLabel` returns correct boundaries ("today",
-   "yesterday", "3 months ago", "2 years ago").
+7. **District naming → durable place; wire WorldView.** Inline name field
+   on district finish creating a `Place` (stable id, centroid anchor) and
+   linking `placeId`; mount `MapCanvas`+`MapKit`; gate the EPIC 1 readout on
+   `places.length > 0`.
+   *AC:* naming a district creates a place with a stable id and a centroid
+   anchor; appending further strata (redraw) or an `Undo` leaves that place
+   in `world.places` with the same id and anchor; an entry referencing that
+   `placeId` still resolves through `placeLedger`. On-map tap never opens
+   recall (non-goal held).
 
-8. **World list UI.** Create/name/open worlds; designed empty state;
-   export/import/save controls; mobile-first at 390px. *AC:* create adds a
-   world; open sets `activeWorldId`; empty state renders the pre-swept
-   copy; no horizontal scroll at 390px; controls are keyboard-reachable
-   and labeled.
-
-9. **Opened world UI (read-only recall readout).** Places list; per place,
-   entries newest-first with dates and one elapsed line; designed
-   no-entries line. *AC:* a place with history shows its entries and a
-   correct elapsed line; a place with none shows the invite line, not a
-   dead end. No map, no panel.
-
-10. **Runtime config + analytics/error hooks.** `config.ts`,
-    `public/config.js`, Umami injector, Sentry init + `reportError` +
-    `ErrorBoundary`. *AC:* with empty config, no Umami script is injected
-    and `Sentry.init` is never called; with config present, the script is
-    injected and init runs with `sendDefaultPii:false`; `beforeSend`
-    strips request/breadcrumb data; `reportError` accepts only an `Error`.
-
-11. **Seed demo + seeding logic.** `demoAtlas.ts`; startup seeding rules.
-    *AC:* empty IndexedDB + `SEED_DEMO` truthy loads the demo and
-    auto-opens it, and its recall readout is non-empty with a correct
-    elapsed line; a non-empty IndexedDB is never overwritten; `SEED_DEMO`
-    falsy shows the designed empty state.
-
-12. **Docker + staging deploy.** `Dockerfile`, `nginx.conf`,
-    `docker/entrypoint.sh`, `docker-compose.staging.yml`. *AC:* `docker
-    compose -f docker-compose.staging.yml up --build` builds and serves;
-    the served page shows the app shell and a `config.js` with
-    `SEED_DEMO:"1"`; a fresh browser session lands on the demo world's
-    readout. Capture a log/screenshot artifact of the running container.
-
-13. **README + ATLAS_FORMAT + copy sweep.** Rewrite `README.md`
-    (understand / run / contribute, verified against the compose file, no
-    factory internals); write `ATLAS_FORMAT.md`; run the mechanical copy
-    sweep across `src/copy.ts`, `demoAtlas.ts`, and `README.md`. *AC:*
-    README commands match the actual files; the sweep test passes; no
-    "—"/"–", no banned vocabulary, no negative empty-state phrasing in any
-    user-visible string.
+8. **Demo showcase stratum + styles + docs + copy sweep.** Add the seeded
+   stratum to `demoAtlas`; add map tokens/parchment/kit styles; add the
+   `map` copy section; update `ATLAS_FORMAT.md`; run the mechanical copy
+   sweep over `copy.ts`, the demo labels, and `ATLAS_FORMAT.md`. Capture a
+   screenshot of the rendered showcase map as an artifact.
+   *AC:* the sample world renders a coherent hand-drawn atlas (screenshot
+   artifact attached); `npm run build`, `npm run lint`, `npm test` pass; the
+   copy sweep finds no "—"/"–", no banned vocabulary, and no negative
+   empty-state phrasing in any user-visible string; `ATLAS_FORMAT.md`
+   matches what the code writes; EPIC 1 tests still pass.
 
 ---
 
-## Test plan (which automated test proves each criterion)
+## Test plan (which automated test proves each planner criterion)
 
-Use `vitest` + `@testing-library/react` + `jsdom` + `fake-indexeddb`.
-Every planner acceptance criterion maps to at least one test below.
+Use the existing `vitest` + `@testing-library/react` + `jsdom` stack.
 
-- **Staging builds and serves** (planner AC 1): a docker verification step
-  in task 12 (run `docker compose ... up --build`, `curl
-  http://localhost:8080/` and `http://localhost:8080/config.js`, assert
-  200 + expected content, then bring it down). This is a run-and-observe
-  step, not a unit test; record the result as an artifact. A CI-friendly
-  unit test additionally asserts `nginx.conf` contains the SPA fallback
-  and the compose file targets `serve` and maps the port.
-- **SEED_DEMO lands on content + recall reachable** (planner AC 2):
-  `seed.test`: with empty `fake-indexeddb` and `SEED_DEMO="1"`, App
-  renders the demo world with a non-empty readout and a computed elapsed
-  line; with `SEED_DEMO=""`, App renders the designed empty state, never a
-  blank region.
-- **Lossless round-trip + documented, human-readable JSON** (planner AC 3):
-  `roundtrip.test`: `parseAtlas(serialize(atlas))` deep-equals `atlas` for
-  a fixture with places, strata, shapes (SVG path strings), and entries;
-  assert serialized output is indented JSON with `format` and `version`. A
-  presence test asserts `ATLAS_FORMAT.md` exists and documents the top-level
-  keys.
-- **IndexedDB persistence + FSA fallback parity** (planner AC 4):
-  `persistence.test`: save then reload restores the atlas; `file.test`:
-  with FSA mocked absent, export yields a Blob whose text re-imports
-  equal, and import reads a File equal; with FSA mocked present, save
-  calls the picker and writes serialized content.
-- **First render within ~1s, no white flash** (planner AC 5):
-  `shell.test`: `index.html` contains the app-shell markup and a
-  non-white body background; a render test asserts real content
-  (world list or seeded world) is present after mount without a blank
-  intermediate. (The ~1s wall-clock is confirmed in the task-12 run.)
-- **Hooks inert without env; send no atlas content; no PII** (planner AC
-  6): `hooks.test`: empty config injects no Umami script and never calls
-  `Sentry.init`; populated config injects the script and calls init with
-  `sendDefaultPii:false`; a `beforeSend` unit test drops `request` and
-  data breadcrumbs; a structural test confirms `reportError` takes only an
-  `Error`.
-- **Copy sweep** (QUALITY BAR §8): `copy.test`: scan every exported string
-  in `src/copy.ts` and the demo bodies for "—", "–", the banned
-  vocabulary list, and negative empty-state phrasing ("You don't have",
-  "No … yet", "Nothing … here", "Unable to", "Something went wrong");
-  assert zero hits.
-- **World list + model** (scope): `worldlist.test` (create/open, empty
-  state copy), `ledger.test`, `elapsed.test`, `migrate.test` (identity for
-  v1, clean rejection of a newer version).
+- **Draw and label a district, draw a road and a coastline, drop a stamp,
+  mark a fog edge, using only the fixed kit** (planner AC 1):
+  `mapCanvas.test.tsx` drives each tool through select → place → `Finish`
+  and asserts a committed shape of the matching `ShapeType` in
+  `currentShapes`; naming the district creates the linked place.
+  `kit.test.ts` asserts the tool set is exactly the six and frozen.
 
-**Definition of done:** `npm run build`, `npm run lint`, and `npm test`
-all pass; `docker compose -f docker-compose.staging.yml up --build` serves
-the app and a fresh session lands on the demo world's readout; the copy
-sweep is clean; `README.md` and `ATLAS_FORMAT.md` are accurate.
+- **No raster brush, no color picker beyond the palette, no layers panel**
+  (planner AC 2): `mapKit.test.tsx` asserts the rendered kit has no
+  `<input type="color">`, no raster `<canvas>`, no file input, and no
+  layers control; swatches equal the fixed palette count; stamps equal the
+  fixed set.
+
+- **A crooked amateur test map renders as a coherent, atlas-like place**
+  (planner AC 3): `mapRender.test.ts` renders the crooked showcase fixture
+  deterministically and asserts smoothing is applied, only palette tokens
+  are used, the ink filter is referenced, and fog uses the feathered
+  treatment. The human-judgment half is backed by a **required screenshot
+  artifact** of the rendered sample map, declared in `result.json`.
+
+- **Naming a district creates a place with a stable id that survives
+  redrawing** (planner AC 4): `placeIdentity.test.ts` names a district
+  (place `P`, centroid anchor), then appends further strata and an `Undo`,
+  and asserts `P` remains in `world.places` with the same id and anchor and
+  that an entry on `P` still resolves via `placeLedger`.
+
+- **Every edit appends a stratum; no edit mutates or deletes a prior
+  stratum's shapes** (planner AC 5): `strata.test.ts` proves `strata.length`
+  grows by one per commit/name/undo, `currentStratumId`/`derivedFrom`
+  advance correctly, and every prior `Stratum` is deep-equal to a clone
+  captured before the call.
+
+- **Drawing and labeling fully operable by touch at 390px, ~44px targets,
+  no horizontal scroll, one unambiguous primary action** (planner AC 6):
+  `mapKit.test.tsx` asserts every control is ≥44px, keyboard-reachable, and
+  focus-visible, and that only one primary control renders at a time; a
+  `mapCanvas.test.tsx` case focuses the canvas and asserts arrow+`Enter`
+  places a vertex (keyboard parity). A structural check asserts the layout
+  is single-column with no fixed width exceeding the 390px column.
+
+- **The empty canvas shows a designed state in the product's voice with
+  positive phrasing** (planner AC 7): `mapCanvas.test.tsx` renders a fresh
+  world and asserts the empty-canvas title/body/action from `copy.ts`; the
+  existing `copy.test` sweep extends to the new `map` strings and the demo
+  labels and asserts zero hits for "—"/"–", banned vocabulary, and negative
+  empty-state phrasing.
+
+**Definition of done:** `npm run build`, `npm run lint`, and `npm test` all
+pass; the sample world renders a coherent hand-drawn atlas captured as a
+screenshot artifact; the copy sweep is clean; `ATLAS_FORMAT.md` matches the
+code; and no non-goal (time-scrub, image import, recall, pan/zoom, raster
+brush, color picker, layers) shipped.
 
 ---
 
 ## Risks and guardrails
-- **Drift into EPIC 4.** The read-only readout is the single tempting
-  place to over-build. Keep it a plain list. No map, no panel, no
-  animation, no ledger screen, no performance budget here.
-- **Env baked into the build.** Do not read Umami/Sentry/SEED_DEMO from
-  `import.meta.env` at build time. They must come from `config.js` at
-  container start, so one image serves any deploy.
-- **Overwriting a real atlas with the demo.** Seed only when IndexedDB is
-  empty. A returning user's file is sacred.
-- **Place identity.** Entries reference `placeId`, and places outlive map
-  revisions. Getting this wrong quietly breaks recall two EPICs later.
+- **Drawing-surface jank (the plan's highest build risk).** The defense is
+  scope, not effort. Vertex-tap drawing, a fixed viewBox, no pan/zoom, no
+  post-commit reshape, and a frozen kit are all binding. If the surface
+  drifts toward a general drawing app, it fails the bar.
+- **Palimpsest growth.** Each edit appends a full snapshot. That is the
+  product's durable value, not a leak. Keep the hot render path reading only
+  the current stratum so render cost never scales with history. Do not cap
+  or prune strata (that would destroy EPIC 5 and the point of the product).
+- **False precision.** Fog edges ship here, feathered, so a half-remembered
+  place can stay honest. Do not defer them.
+- **Place identity.** Places live at `world.places` with centroid anchors,
+  never inside strata. A map edit must never touch `world.places` except to
+  add a newly named place. Getting this wrong quietly breaks recall in
+  EPIC 4.
+- **Recall creep.** It is tempting to light up a district on tap with its
+  entries. That is EPIC 4 and a binding non-goal here. On-map tap only
+  draws; the EPIC 1 readout stays as the honest recall until EPIC 4.
