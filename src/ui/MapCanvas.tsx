@@ -50,6 +50,7 @@ export function MapCanvas({ world }: { world: World }) {
   const [pendingLabel, setPendingLabel] = useState<Point | null>(null);
   const [nameValue, setNameValue] = useState("");
   const [labelValue, setLabelValue] = useState("");
+  const [focused, setFocused] = useState(false);
 
   const hintId = useId();
   const canvasRef = useRef<SVGSVGElement>(null);
@@ -203,6 +204,8 @@ export function MapCanvas({ world }: { world: World }) {
           tabIndex={0}
           onClick={handleClick}
           onKeyDown={handleKeyDown}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
         >
           <MapDefs />
           <rect className="map-paper" x={0} y={0} width={1000} height={1000} />
@@ -224,7 +227,7 @@ export function MapCanvas({ world }: { world: World }) {
             </g>
           )}
 
-          {!busy && (
+          {!busy && (focused || drawing) && (
             <g className="reticle" aria-hidden="true">
               <circle cx={reticle.x} cy={reticle.y} r={12} />
               <line
