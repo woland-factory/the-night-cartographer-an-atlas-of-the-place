@@ -1,14 +1,21 @@
 import { getConfig } from "../config";
 import { demoAtlas, demoWorld, SAMPLE_WORLD_ID } from "../data/demoAtlas";
-import type { AtlasFile, Shape, World } from "../model/atlas";
-import { createAtlas, createPlace, createWorld } from "../model/factory";
+import type { AtlasFile, Point, Shape, World } from "../model/atlas";
+import {
+  createAtlas,
+  createEntry,
+  createPlace,
+  createWorld,
+} from "../model/factory";
 import { polygonCentroid, stringToPoints } from "../model/geometry";
+import { MAX_BODY } from "../model/schema";
 import {
   commitShape as commitShapeInWorld,
   currentShapes,
   snapshotWith,
   undoLastEdit as undoLastEditInWorld,
 } from "../model/strata";
+import { reportError } from "../hooks/errors";
 import { loadAtlas, saveAtlas } from "../persistence/idb";
 
 // The single source of truth. An in-memory atlas plus subscribe, wired for
@@ -17,9 +24,15 @@ import { loadAtlas, saveAtlas } from "../persistence/idb";
 
 type Listener = () => void;
 
+// The device-write status, surfaced so the world view can show a designed,
+// actionable banner when a genuine autosave fails. The entry is already in
+// memory (optimistic), so this only reports a real persistence failure.
+export type SaveStatus = "idle" | "saving" | "error";
+
 const SAVE_DEBOUNCE_MS = 500;
 
 let atlas: AtlasFile | null = null;
+let saveStatus: SaveStatus = "idle";
 const listeners = new Set<Listener>();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -27,11 +40,31 @@ function emit(): void {
   for (const listener of listeners) listener();
 }
 
+function setSaveStatus(next: SaveStatus): void {
+  if (saveStatus === next) return;
+  saveStatus = next;
+  emit();
+}
+
+export function getSaveStatus(): SaveStatus {
+  return saveStatus;
+}
+
 function scheduleSave(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    if (atlas) void saveAtlas(atlas);
+    const current = atlas;
+    if (!current) return;
+    setSaveStatus("saving");
+    saveAtlas(current).then(
+      () => setSaveStatus("idle"),
+      (err: unknown) => {
+        // Report the failure without ever handing atlas content to the tracker.
+        reportError(err instanceof Error ? err : new Error("atlas save failed"));
+        setSaveStatus("error");
+      },
+    );
   }, SAVE_DEBOUNCE_MS);
 }
 
@@ -164,6 +197,48 @@ export function undoLastEdit(worldId: string): void {
   replaceWorld(worldId, (world) => undoLastEditInWorld(world));
 }
 
+// Pin one morning's entry to a place. The composer prevents bad input; the
+// store re-checks (defense in depth): the placeId must exist in this world, the
+// date must be YYYY-MM-DD, and the body must be non-empty after trimming. The
+// body is stored trimmed and capped. Optimistic and synchronous: the caller
+// can read the new entry immediately.
+export function addEntry(
+  worldId: string,
+  placeId: string,
+  date: string,
+  body: string,
+): void {
+  if (!atlas) return;
+  const world = atlas.worlds.find((w) => w.id === worldId);
+  if (!world) return;
+  if (!world.places.some((p) => p.id === placeId)) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  const trimmed = body.trim().slice(0, MAX_BODY);
+  if (!trimmed) return;
+  replaceWorld(worldId, (w) => ({
+    ...w,
+    entries: [...w.entries, createEntry(placeId, date, trimmed)],
+  }));
+}
+
+// Mint a bare place at a dropped point (a Point anchor, no district shape and
+// no new stratum) and return its id so the composer can select it. A dropped
+// place lands in world.places exactly like a district-born place, so recall
+// survives later redraws. Returns null (and does nothing) for an empty name.
+export function addPlaceAtPoint(
+  worldId: string,
+  name: string,
+  point: Point,
+): string | null {
+  if (!atlas) return null;
+  const world = atlas.worlds.find((w) => w.id === worldId);
+  if (!world) return null;
+  if (!name.trim()) return null;
+  const place = createPlace(name, point);
+  replaceWorld(worldId, (w) => ({ ...w, places: [...w.places, place] }));
+  return place.id;
+}
+
 // Import replaces the working atlas with the imported one.
 export function importAtlas(next: AtlasFile): void {
   set(next, true);
@@ -174,4 +249,5 @@ export function __resetStoreForTests(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   atlas = null;
+  saveStatus = "idle";
 }

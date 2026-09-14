@@ -9,7 +9,9 @@ import { MAX_LABEL_LENGTH } from "./kit";
 // capped: its growth is the product's durable value, not a leak.
 const MAX_NAME = 200;
 const MAX_GEOMETRY = 20_000;
-const MAX_BODY = 20_000;
+// The entry body cap. Exported so the store and the composer enforce the same
+// bound the schema validates on import.
+export const MAX_BODY = 20_000;
 const MAX_SHAPES_PER_STRATUM = 2_000;
 
 const pointSchema = z.object({ x: z.number(), y: z.number() });
