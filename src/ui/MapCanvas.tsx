@@ -1,4 +1,10 @@
-import { useId, useState, type KeyboardEvent, type MouseEvent } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import { copy } from "../copy";
 import type { Point, Shape, ShapeType, World } from "../model/atlas";
 import { pointsToString, smoothPath } from "../model/geometry";
@@ -46,6 +52,7 @@ export function MapCanvas({ world }: { world: World }) {
   const [labelValue, setLabelValue] = useState("");
 
   const hintId = useId();
+  const canvasRef = useRef<SVGSVGElement>(null);
   const kind = toolFor(tool).kind;
   const shapes = currentShapes(world);
   const busy = pendingDistrict !== null || pendingLabel !== null;
@@ -187,6 +194,7 @@ export function MapCanvas({ world }: { world: World }) {
     <div className="map-editor">
       <div className="map-stage">
         <svg
+          ref={canvasRef}
           className="map-canvas"
           viewBox="0 0 1000 1000"
           role="application"
@@ -242,7 +250,10 @@ export function MapCanvas({ world }: { world: World }) {
             <button
               type="button"
               className="btn btn--primary"
-              onClick={() => selectTool("district")}
+              onClick={() => {
+                selectTool("district");
+                canvasRef.current?.focus();
+              }}
             >
               {copy.map.empty.action}
             </button>
