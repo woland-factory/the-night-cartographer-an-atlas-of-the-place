@@ -87,6 +87,33 @@ export const copy = {
     },
   },
 
+  composer: {
+    title: "Write a dream",
+    bodyLabel: "Your dream",
+    bodyPlaceholder: "What did you see?",
+    dateLabel: "Date",
+    placeLabel: "Pin it to a place",
+    newPlace: "New place",
+    dropHint: "Tap the map to place it.",
+    newPlaceNameLabel: "Name this place",
+    newPlaceNamePlaceholder: "The Harbor",
+    newPlaceConfirm: "Add place",
+    save: "Save",
+    cancel: "Cancel",
+    close: "Close",
+    open: "Write a dream",
+    needBody: "Write a few words to save.",
+    needPlace: "Pick a place to save.",
+    emptyPlacesTitle: "Add a place to pin to.",
+    emptyPlacesBody: "Drop a place on the map, then pin your dream to it.",
+  },
+
+  saveError: {
+    title: "Save your atlas to keep these changes.",
+    body: "This device isn't storing new changes right now. Save your atlas to a file so you keep them.",
+    action: "Save to file",
+  },
+
   importError: {
     unreadable: "That file isn't an atlas we can read. Pick another.",
     "newer-version":

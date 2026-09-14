@@ -510,3 +510,232 @@ h2 {
 .kit__actions .btn {
   flex: 1 1 auto;
 }
+
+/* Write-a-dream primary action */
+.write-dream {
+  margin: var(--space-3) 0;
+}
+
+/* Save-error banner */
+.banner--save {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.banner__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.banner__body {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.banner--save .btn {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+}
+
+/* Entry composer sheet */
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(6, 8, 11, 0.6);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 92vh;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch);
+  min-height: var(--touch);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  border-color: #33404f;
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sheet__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.textarea {
+  min-height: 120px;
+  padding: var(--space-2);
+  resize: vertical;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.chip-btn {
+  min-height: var(--touch);
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.chip-btn:hover {
+  border-color: #33404f;
+}
+
+.chip-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.chip-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.chip-btn--new {
+  border-style: dashed;
+}
+
+.place-empty {
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  text-align: center;
+}
+
+.place-empty__title {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+
+.place-empty__body {
+  margin: 0 auto var(--space-2);
+  max-width: 30ch;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* The sticky action bar is a sibling after the scrollable body, so the
+   on-screen keyboard can never cover Save. */
+.sheet__actions {
+  position: sticky;
+  bottom: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: var(--space-2) var(--space-3);
+  padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+}
+
+.sheet__helper {
+  margin: 0 0 var(--space-2);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* The drop detour: a slim bar, no scrim, so the map behind stays tappable. */
+.drop-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+}
+
+.drop-bar__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.drop-bar__hint {
+  margin: 0;
+  font-weight: 550;
+}
+
+.drop-bar__form .field {
+  margin-bottom: var(--space-2);
+}
+
+/* Centered dialog on wider screens; bottom sheet stays for phones. */
+@media (min-width: 560px) {
+  .sheet-scrim {
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-3);
+  }
+
+  .sheet {
+    max-width: 480px;
+    border-radius: var(--radius);
+  }
+
+  .drop-bar {
+    left: 50%;
+    right: auto;
+    bottom: var(--space-3);
+    transform: translateX(-50%);
+    width: min(480px, calc(100% - 2 * var(--space-3)));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+}

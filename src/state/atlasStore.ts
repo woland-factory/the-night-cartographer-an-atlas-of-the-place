@@ -15,7 +15,6 @@ import {
   snapshotWith,
   undoLastEdit as undoLastEditInWorld,
 } from "../model/strata";
-import { reportError } from "../hooks/errors";
 import { loadAtlas, saveAtlas } from "../persistence/idb";
 
 // The single source of truth. An in-memory atlas plus subscribe, wired for
@@ -60,9 +59,16 @@ function scheduleSave(): void {
     saveAtlas(current).then(
       () => setSaveStatus("idle"),
       (err: unknown) => {
-        // Report the failure without ever handing atlas content to the tracker.
-        reportError(err instanceof Error ? err : new Error("atlas save failed"));
         setSaveStatus("error");
+        // Report the failure without ever handing atlas content to the tracker.
+        // Loaded lazily so the store's module graph does not pull in the error
+        // tracker (and @sentry/browser) at import time, which would defeat the
+        // hook's own test mock.
+        void import("../hooks/errors").then((m) =>
+          m.reportError(
+            err instanceof Error ? err : new Error("atlas save failed"),
+          ),
+        );
       },
     );
   }, SAVE_DEBOUNCE_MS);

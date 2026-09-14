@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { placeLedger } from "../model/ledger";
 import { fullAtlasFixture } from "../test/fixtures";
 import * as idb from "../persistence/idb";
 import {
   addEntry,
   addPlaceAtPoint,
+  commitShape,
   getSaveStatus,
   getState,
   importAtlas,
@@ -70,6 +72,33 @@ describe("addPlaceAtPoint", () => {
     const before = world().places.length;
     expect(addPlaceAtPoint("w1", "   ", { x: 1, y: 2 })).toBeNull();
     expect(world().places).toHaveLength(before);
+  });
+});
+
+describe("entries survive later map revisions (recall foundation)", () => {
+  it("keeps an entry resolving to its place after a redraw appends a stratum", () => {
+    importAtlas(fullAtlasFixture());
+    addEntry("w1", "p1", "2026-09-14", "the pier at low tide");
+
+    const before = placeLedger(world().entries, "p1");
+    expect(before.count).toBe(3); // two fixture entries plus the new one
+
+    // Redraw the map: a new stratum, a wholly new revision.
+    commitShape("w1", {
+      id: "sh-redraw",
+      type: "road",
+      geometry: "0,0 500,500",
+      styleToken: "rust",
+    });
+
+    // The place is unchanged and the entry still resolves to it.
+    const place = world().places.find((p) => p.id === "p1");
+    expect(place?.anchor).toEqual({ x: 50, y: 50 });
+    const after = placeLedger(world().entries, "p1");
+    expect(after.count).toBe(3);
+    expect(after.entries.some((e) => e.body === "the pier at low tide")).toBe(
+      true,
+    );
   });
 });
 

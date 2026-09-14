@@ -47,6 +47,9 @@ interface MapCanvasProps {
   // Called when a place marker is tapped while not mid-draw and not dropping, so
   // the world view can open the composer already pinned to that place.
   onPickPlace?: (placeId: string) => void;
+  // False while the composer is already open, so markers behind the modal are
+  // inert (never a duplicate focus target or a competing accessible name).
+  pickable?: boolean;
 }
 
 // The drawing surface plus its toolbar. Draw-tool selection, in-progress
@@ -57,6 +60,7 @@ export function MapCanvas({
   dropping = false,
   onDropPoint,
   onPickPlace,
+  pickable = true,
 }: MapCanvasProps) {
   const [tool, setTool] = useState<ShapeType>("district");
   const [token, setToken] = useState<PaletteToken>("ink");
@@ -80,7 +84,7 @@ export function MapCanvas({
   const showEmpty = shapes.length === 0 && !drawing && !busy && !dropping;
   // A marker answers a tap only when nothing is being drawn, named, or dropped,
   // so it never fights the drawing surface or the point-capture gesture.
-  const canPick = !drawing && !busy && !dropping;
+  const canPick = pickable && !drawing && !busy && !dropping;
 
   function selectTool(next: ShapeType) {
     setTool(next);
