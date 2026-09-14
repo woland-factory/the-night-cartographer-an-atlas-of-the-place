@@ -1,7 +1,7 @@
 # The atlas file format
 
 An atlas is one JSON document. It is human-readable and diff-friendly
-(2-space indentation), and the map geometry is embedded as SVG path strings,
+(2-space indentation), and the map geometry is stored as plain vertex lists,
 so the whole atlas is a single file you own that outlives this tool.
 
 The current schema is version `1`.
@@ -68,14 +68,19 @@ link between a place and what you wrote there.
 ## Stratum
 
 One dated map revision. Editing the map appends a new stratum instead of
-changing an old one (the palimpsest). Drawing tools arrive in a later release;
-the shape below is defined now so old files keep working.
+changing an old one (the palimpsest): every committed edit writes a full
+snapshot of the map at that revision, and prior strata are never changed or
+removed. `currentStratumId` on the world points at the newest, and `derivedFrom`
+links each stratum to the one it grew from. The revision history grows the file
+over time. That accumulation is the point of the tool, not a leak: the reader
+only ever draws the current stratum, so drawing stays fast no matter how long
+the history gets.
 
 ```json
 {
   "id": "uuid",
   "createdAt": "2020-01-02T00:00:00.000Z",
-  "label": "first draft",
+  "label": "first survey",
   "derivedFrom": null,
   "shapes": []
 }
@@ -87,7 +92,7 @@ the shape below is defined now so old files keep working.
 {
   "id": "uuid",
   "type": "district",
-  "geometry": "M10 10 L90 10 L90 90 L10 90 Z",
+  "geometry": "120,140 360,120 400,360 160,380",
   "styleToken": "ink",
   "text": "The Harbor",
   "placeId": "place-id"
@@ -95,10 +100,17 @@ the shape below is defined now so old files keep working.
 ```
 
 - `type`: one of `district`, `road`, `coastline`, `label`, `stamp`, `fog`.
-- `geometry`: an SVG path `d` string, or serialized points.
-- `styleToken`: a key into a fixed palette.
-- `text`: label text, when the shape carries a label.
-- `placeId`: links a district shape to a place.
+- `geometry`: honest vertices, stylized only at read time. Line and area shapes
+  (`district`, `road`, `coastline`, `fog`) store a space-separated list of
+  `"x,y"` points in the canvas 0..1000 space. Point shapes (`stamp`, `label`)
+  store one `"x,y"`. The smoothed drawing path is computed by the app, never
+  stored, so the same vertices can be restyled or replayed later.
+- `styleToken`: one of the fixed palette keys `ink`, `sea`, `moss`, `rust`,
+  `plum`, `fog`.
+- `text`: the label string for a `label` shape, or the glyph id for a `stamp`
+  (one of `tower`, `tree`, `bridge`, `mountain`, `well`, `compass`).
+- `placeId`: set on a district that has been named, linking it to the place that
+  naming minted.
 
 ## Entry
 

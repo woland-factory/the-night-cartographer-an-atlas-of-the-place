@@ -27,7 +27,7 @@ export function fullAtlasFixture(): AtlasFile {
               {
                 id: "sh1",
                 type: "district",
-                geometry: "M10 10 L90 10 L90 90 L10 90 Z",
+                geometry: "120,140 360,120 400,360 160,380",
                 styleToken: "ink",
                 text: "The Harbor",
                 placeId: "p1",
@@ -35,8 +35,8 @@ export function fullAtlasFixture(): AtlasFile {
               {
                 id: "sh2",
                 type: "coastline",
-                geometry: "M0 100 C 40 80, 60 120, 100 100",
-                styleToken: "wave",
+                geometry: "40,620 200,660 360,600 520,640",
+                styleToken: "sea",
               },
             ],
           },

@@ -16,9 +16,9 @@ describe("serialize / parseAtlas", () => {
     const text = serialize(fullAtlasFixture());
     expect(text).toContain('"format": "night-cartographer-atlas"');
     expect(text).toContain('"version": 1');
-    // 2-space indentation is present (SVG geometry lives inside as a string).
+    // 2-space indentation is present (vertex geometry lives inside as a string).
     expect(text).toContain('\n  "worlds"');
-    expect(text).toContain("M10 10 L90 10 L90 90 L10 90 Z");
+    expect(text).toContain("120,140 360,120 400,360 160,380");
   });
 
   it("rejects invalid JSON with a friendly reason, never a throw", () => {

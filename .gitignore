@@ -16,3 +16,6 @@ dist-ssr
 coverage
 playwright-report
 test-results
+
+# Generated run artifacts (screenshots, reports)
+artifacts
