@@ -65,6 +65,12 @@ link between a place and what you wrote there.
 - `anchor`: a point `{ x, y }`, a reference `{ "shapeRef": "shape-id" }`, or
   `null`.
 
+A place is minted two ways. Naming a district mints a place anchored at that
+district's centroid. Dropping a point on the map mints a place anchored at that
+point, with no district shape. Both live in `places` and both keep their `id`
+forever, so recall answers the same way for either kind after the map is
+redrawn.
+
 ## Stratum
 
 One dated map revision. Editing the map appends a new stratum instead of

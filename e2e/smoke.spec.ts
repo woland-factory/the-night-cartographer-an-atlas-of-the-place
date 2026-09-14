@@ -16,3 +16,21 @@ test("a visitor opens the sample world and a place answers back", async ({
   await expect(page.getByRole("heading", { name: "The Harbor" })).toBeVisible();
   await expect(page.getByText(/Last visit here:/).first()).toBeVisible();
 });
+
+// The sub-minute gesture on the production build: open the composer, type a
+// dream, pick a place, save, and see it appear in that place's readout at once.
+test("a visitor writes a dream and it appears in the place readout", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open the sample atlas" }).click();
+
+  await page.getByRole("button", { name: "Write a dream" }).click();
+
+  const dream = "a staircase down into warm water";
+  await page.getByLabel("Your dream").fill(dream);
+  await page.getByRole("button", { name: "The Harbor", pressed: false }).click();
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText(dream)).toBeVisible();
+});
