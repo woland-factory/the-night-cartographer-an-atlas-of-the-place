@@ -343,6 +343,46 @@ h2 {
   stroke-width: 2;
 }
 
+/* Place markers: a quiet dot with a ring, sized so the hit area is a
+   comfortable target while the visible mark stays subtle. */
+.map-marker {
+  cursor: pointer;
+}
+
+.map-marker--inert {
+  pointer-events: none;
+}
+
+.map-marker__hit {
+  fill: transparent;
+}
+
+.map-marker__ring {
+  fill: none;
+  stroke: var(--map-ink);
+  stroke-width: 2;
+  stroke-opacity: 0.55;
+}
+
+.map-marker__dot {
+  fill: var(--map-ink);
+  fill-opacity: 0.7;
+}
+
+.map-marker:hover .map-marker__ring,
+.map-marker:focus-visible .map-marker__ring {
+  stroke-opacity: 0.9;
+}
+
+.map-marker:focus {
+  outline: none;
+}
+
+.map-marker:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .map-empty {
   position: absolute;
   inset: 0;

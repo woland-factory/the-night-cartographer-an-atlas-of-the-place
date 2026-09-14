@@ -6,6 +6,7 @@ import type { World } from "../model/atlas";
 import { currentShapes } from "../model/strata";
 import { addWorld, getState, init, openWorld } from "../state/atlasStore";
 import { App } from "./App";
+import { MapCanvas } from "./MapCanvas";
 
 function activeWorld(): World {
   const atlas = getState();
@@ -149,5 +150,86 @@ describe("MapCanvas", () => {
     expect(
       screen.getByRole("button", { name: copy.map.undoPoint }),
     ).toBeInTheDocument();
+  });
+});
+
+function worldWithPlace(): World {
+  return {
+    id: "w1",
+    name: "Harbor City",
+    createdAt: "2020-01-01T00:00:00.000Z",
+    places: [
+      {
+        id: "p1",
+        name: "The Harbor",
+        anchor: { x: 500, y: 500 },
+        createdAt: "2020-01-01T00:00:00.000Z",
+      },
+    ],
+    strata: [],
+    currentStratumId: null,
+    entries: [],
+  };
+}
+
+describe("MapCanvas place markers and drop mode", () => {
+  it("renders a keyboard-focusable marker and picks its place on tap", async () => {
+    const user = userEvent.setup();
+    const onPickPlace = vi.fn();
+    render(<MapCanvas world={worldWithPlace()} onPickPlace={onPickPlace} />);
+
+    const marker = screen.getByRole("button", { name: "The Harbor" });
+    expect(marker).toHaveAttribute("tabindex", "0");
+
+    await user.click(marker);
+    expect(onPickPlace).toHaveBeenCalledWith("p1");
+    // The tap picks the place; it never starts a drawing.
+    expect(screen.queryByRole("button", { name: copy.map.undoPoint })).toBeNull();
+  });
+
+  it("picks a place from the marker via keyboard Enter", () => {
+    const onPickPlace = vi.fn();
+    render(<MapCanvas world={worldWithPlace()} onPickPlace={onPickPlace} />);
+    const marker = screen.getByRole("button", { name: "The Harbor" });
+    marker.focus();
+    fireEvent.keyDown(marker, { key: "Enter" });
+    expect(onPickPlace).toHaveBeenCalledWith("p1");
+  });
+
+  it("makes markers inert while a shape is in progress", () => {
+    const onPickPlace = vi.fn();
+    render(<MapCanvas world={worldWithPlace()} onPickPlace={onPickPlace} />);
+    const c = screen.getByRole("application", { name: copy.map.canvasLabel });
+    c.focus();
+    fireEvent.keyDown(c, { key: "ArrowRight" });
+    fireEvent.keyDown(c, { key: "Enter" }); // one vertex: drawing in progress
+
+    expect(screen.queryByRole("button", { name: "The Harbor" })).toBeNull();
+    expect(onPickPlace).not.toHaveBeenCalled();
+  });
+
+  it("captures a single point on tap in dropping mode, committing no shape", () => {
+    const onDropPoint = vi.fn();
+    render(
+      <MapCanvas world={worldWithPlace()} dropping onDropPoint={onDropPoint} />,
+    );
+    mockCanvasRect();
+    const c = screen.getByRole("application", { name: copy.map.canvasLabel });
+    fireEvent.click(c, { clientX: 300, clientY: 400 });
+
+    expect(onDropPoint).toHaveBeenCalledWith({ x: 300, y: 400 });
+    expect(screen.queryByRole("button", { name: copy.map.finish })).toBeNull();
+  });
+
+  it("captures a point via reticle + Enter in dropping mode", () => {
+    const onDropPoint = vi.fn();
+    render(
+      <MapCanvas world={worldWithPlace()} dropping onDropPoint={onDropPoint} />,
+    );
+    const c = screen.getByRole("application", { name: copy.map.canvasLabel });
+    c.focus();
+    fireEvent.keyDown(c, { key: "Enter" }); // reticle at center
+
+    expect(onDropPoint).toHaveBeenCalledWith({ x: 500, y: 500 });
   });
 });

@@ -37,10 +37,27 @@ function newId(): string {
   return crypto.randomUUID();
 }
 
+interface MapCanvasProps {
+  world: World;
+  // When true, the next canvas tap (or reticle + Enter) resolves to a point and
+  // calls onDropPoint instead of dropping a drawing vertex. Used by the
+  // composer's "New place" flow.
+  dropping?: boolean;
+  onDropPoint?: (point: Point) => void;
+  // Called when a place marker is tapped while not mid-draw and not dropping, so
+  // the world view can open the composer already pinned to that place.
+  onPickPlace?: (placeId: string) => void;
+}
+
 // The drawing surface plus its toolbar. Draw-tool selection, in-progress
 // vertices, and the reticle are local state here (transient, never persisted
 // until Finish). Committing goes through the store, which appends a stratum.
-export function MapCanvas({ world }: { world: World }) {
+export function MapCanvas({
+  world,
+  dropping = false,
+  onDropPoint,
+  onPickPlace,
+}: MapCanvasProps) {
   const [tool, setTool] = useState<ShapeType>("district");
   const [token, setToken] = useState<PaletteToken>("ink");
   const [stamp, setStamp] = useState<StampId>("tower");
@@ -60,7 +77,10 @@ export function MapCanvas({ world }: { world: World }) {
   const drawing = vertices.length > 0;
   const canFinish = kind === "area" ? vertices.length >= 3 : vertices.length >= 2;
   const canUndo = world.strata.length > 0;
-  const showEmpty = shapes.length === 0 && !drawing && !busy;
+  const showEmpty = shapes.length === 0 && !drawing && !busy && !dropping;
+  // A marker answers a tap only when nothing is being drawn, named, or dropped,
+  // so it never fights the drawing surface or the point-capture gesture.
+  const canPick = !drawing && !busy && !dropping;
 
   function selectTool(next: ShapeType) {
     setTool(next);
@@ -81,6 +101,11 @@ export function MapCanvas({ world }: { world: World }) {
 
   // A tap or a keyboard Enter both place at a point in canvas space.
   function placeAt(p: Point) {
+    // Drop mode is a one-shot capture: the point becomes a place, not a vertex.
+    if (dropping) {
+      onDropPoint?.(p);
+      return;
+    }
     if (busy) return;
     if (tool === "stamp") {
       commitShape(world.id, {
@@ -212,6 +237,41 @@ export function MapCanvas({ world }: { world: World }) {
           {shapes.map(renderShape)}
           {pendingDistrict && renderShape(pendingDistrict)}
 
+          {world.places.map((place) => {
+            const anchor = place.anchor;
+            if (!anchor || !("x" in anchor)) return null; // shapeRef/null: no marker
+            return canPick ? (
+              <g
+                key={place.id}
+                className="map-marker"
+                role="button"
+                tabIndex={0}
+                aria-label={place.name}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPickPlace?.(place.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onPickPlace?.(place.id);
+                  }
+                }}
+              >
+                <circle className="map-marker__hit" cx={anchor.x} cy={anchor.y} r={22} />
+                <circle className="map-marker__ring" cx={anchor.x} cy={anchor.y} r={11} />
+                <circle className="map-marker__dot" cx={anchor.x} cy={anchor.y} r={4.5} />
+              </g>
+            ) : (
+              // Inert and pointer-transparent while drawing or dropping.
+              <g key={place.id} className="map-marker map-marker--inert" aria-hidden="true">
+                <circle className="map-marker__ring" cx={anchor.x} cy={anchor.y} r={11} />
+                <circle className="map-marker__dot" cx={anchor.x} cy={anchor.y} r={4.5} />
+              </g>
+            );
+          })}
+
           {drawing && (
             <g className="preview" aria-hidden="true">
               <path
@@ -227,7 +287,7 @@ export function MapCanvas({ world }: { world: World }) {
             </g>
           )}
 
-          {!busy && (focused || drawing) && (
+          {!busy && (focused || drawing || dropping) && (
             <g className="reticle" aria-hidden="true">
               <circle cx={reticle.x} cy={reticle.y} r={12} />
               <line
