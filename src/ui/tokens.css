@@ -229,15 +229,7 @@ h2 {
   margin-top: var(--space-2);
 }
 
-/* Recall readout */
-.place {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-3);
-  margin-bottom: var(--space-2);
-}
-
+/* Recall: the "Last visit here" line, shared by the panel and the ledger */
 .place__last {
   color: var(--accent);
   font-size: 14px;
@@ -258,6 +250,104 @@ h2 {
 
 .entry__body {
   margin: 2px 0 0;
+}
+
+/* Recall panel: the entry list and per-entry elapsed line */
+.recall-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entry__elapsed {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.recall-empty {
+  text-align: center;
+  padding: var(--space-3) 0;
+}
+
+.recall-empty__title {
+  margin: 0 0 var(--space-1);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.recall-empty__body {
+  margin: 0 auto;
+  max-width: 30ch;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Visit ledger: places by last visit, each row opens recall */
+.ledger__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ledger__row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--touch);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ledger__row:hover {
+  border-color: #33404f;
+}
+
+.ledger__row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ledger__name {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.ledger__last {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.ledger__meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* First-recall coach mark: one sentence pointing at the signature moment */
+.hint-mark {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  background: var(--surface);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
+.hint-mark__text {
+  margin: 0;
+  font-size: 14px;
 }
 
 .banner {

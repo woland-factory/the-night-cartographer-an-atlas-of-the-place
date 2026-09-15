@@ -11,8 +11,7 @@ There is no account and no cloud.
 
 You draw the map yourself with a small kit: districts, roads, a coastline,
 labels, stamps, and fog edges for the parts you half-remember. Crooked lines are
-welcome. The shared hand-drawn styling makes them read as one atlas. The
-signature recall panel and the guided first run arrive in later releases.
+welcome. The shared hand-drawn styling makes them read as one atlas.
 
 ## What you can do today
 
@@ -20,9 +19,15 @@ signature recall panel and the guided first run arrive in later releases.
   file you keep and open it again later.
 - Create and name a world.
 - Draw its map with the tool kit, and name a district to mint a place you can
-  pin dreams to later.
-- Open a bundled sample world and see a place answer back with its dated
-  entries and the time since the last visit.
+  pin dreams to.
+- Write a dated dream entry and pin it to a place, dropping a new place on the
+  map mid-write when you need one.
+- Tap any place, on the map or in the visit ledger, and it answers back with
+  everything you wrote there, newest first, plus the time since your last
+  visit. Saving an entry opens that answer in the same gesture.
+- See the visit ledger: every place in the world ordered by last visit.
+- Open a bundled sample world and watch a place answer back with six years of
+  dated entries.
 
 Every edit appends a new revision and keeps the old ones. Your atlas grows into
 a years-long record you own. The app always draws the current revision, so

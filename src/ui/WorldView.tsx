@@ -1,90 +1,35 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { copy } from "../copy";
-import type { Place, Point, World } from "../model/atlas";
-import { elapsedLabel } from "../lib/elapsed";
-import { placeLedger } from "../model/ledger";
+import type { Point, World } from "../model/atlas";
+import { buildRecallIndex } from "../model/recallIndex";
 import { currentShapes } from "../model/strata";
-import {
-  addPlaceAtPoint,
-  closeWorld,
-  getState,
-} from "../state/atlasStore";
+import { hasSeenRecallHint, markRecallHintSeen } from "../lib/firstRun";
+import { addPlaceAtPoint, closeWorld, getState } from "../state/atlasStore";
 import { useSaveStatus } from "../state/useSaveStatus";
 import { saveToFile } from "../persistence/file";
 import { EntryComposer } from "./EntryComposer";
 import { MapCanvas } from "./MapCanvas";
+import { RecallPanel } from "./RecallPanel";
+import { VisitLedger } from "./VisitLedger";
 
-type ComposerState =
-  | { open: false }
-  | {
-      open: true;
-      mode: "compose" | "dropping";
-      placeId: string | null;
-      capturedPoint: Point | null;
-    };
-
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-// Format a YYYY-MM-DD dream date without touching timezones.
-function formatDate(date: string): string {
-  const [y, m, d] = date.split("-").map(Number);
-  if (!y || !m || !d) return date;
-  return `${d} ${MONTHS[m - 1]} ${y}`;
-}
-
-function visitsLabel(count: number): string {
-  return count === 1
-    ? copy.worldView.visitOne
-    : `${count} ${copy.worldView.visitManySuffix}`;
-}
-
-function PlaceCard({ place, world }: { place: Place; world: World }) {
-  const ledger = placeLedger(world.entries, place.id);
-  const now = new Date().toISOString();
-
-  return (
-    <section className="place" aria-labelledby={`place-${place.id}`}>
-      <h2 id={`place-${place.id}`}>{place.name}</h2>
-
-      {ledger.count === 0 ? (
-        <p className="muted">{copy.worldView.placeNoEntries}</p>
-      ) : (
-        <>
-          <p className="place__last">
-            {copy.worldView.lastVisitPrefix}{" "}
-            {elapsedLabel(ledger.lastVisit as string, now)}
-          </p>
-          <p className="card__meta">{visitsLabel(ledger.count)}</p>
-          <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {ledger.entries.map((entry) => (
-              <li className="entry" key={entry.id}>
-                <p className="entry__date">{formatDate(entry.date)}</p>
-                <p className="entry__body">{entry.body}</p>
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
-    </section>
-  );
-}
+// Exactly one sheet is open at a time: the recall panel, the composer, or
+// the composer's drop-a-new-place detour. The map behind an open sheet is
+// inert.
+type View =
+  | { kind: "none" }
+  | { kind: "recall"; placeId: string }
+  | { kind: "compose"; placeId: string | null }
+  | { kind: "dropping"; placeId: string | null; capturedPoint: Point | null };
 
 export function WorldView({ world }: { world: World }) {
-  const [composer, setComposer] = useState<ComposerState>({ open: false });
+  const [view, setView] = useState<View>({ kind: "none" });
+  const [hintSeen, setHintSeen] = useState(() => hasSeenRecallHint());
   const saveStatus = useSaveStatus();
+
+  // Built once per world identity and memoized: a tap never rebuilds it, so
+  // opening recall is an O(1) lookup plus a render at any corpus size. Only
+  // a write changes `world` and rebuilds, off the tap path.
+  const index = useMemo(() => buildRecallIndex(world), [world]);
 
   // Brand-new world (nothing drawn and no places): drawing a district is the
   // intended first step and mints the first place, so the map's own CTA stays
@@ -93,49 +38,63 @@ export function WorldView({ world }: { world: World }) {
   const hasShapes = currentShapes(world).length > 0;
   const showWriteDream = world.places.length > 0 || hasShapes;
 
-  function openCompose(placeId: string | null) {
-    setComposer({ open: true, mode: "compose", placeId, capturedPoint: null });
+  // One dismissible sentence pointing at the signature moment. Gone for good
+  // after the first recall open or an explicit dismiss.
+  const showHint =
+    view.kind === "none" && !hintSeen && index.ledger.some((r) => r.count > 0);
+
+  function dismissHint() {
+    markRecallHintSeen();
+    setHintSeen(true);
   }
 
-  function closeComposer() {
-    setComposer({ open: false });
+  function openRecall(placeId: string) {
+    if (!hintSeen) dismissHint();
+    setView({ kind: "recall", placeId });
+  }
+
+  function openCompose(placeId: string | null) {
+    setView({ kind: "compose", placeId });
+  }
+
+  function closeSheet() {
+    setView({ kind: "none" });
   }
 
   function selectPlace(placeId: string) {
-    setComposer((c) =>
-      c.open ? { ...c, placeId, mode: "compose", capturedPoint: null } : c,
+    setView((v) =>
+      v.kind === "compose" || v.kind === "dropping"
+        ? { kind: "compose", placeId }
+        : v,
     );
   }
 
   function startDrop() {
-    setComposer((c) =>
-      c.open ? { ...c, mode: "dropping", capturedPoint: null } : c,
+    setView((v) =>
+      v.kind === "compose"
+        ? { kind: "dropping", placeId: v.placeId, capturedPoint: null }
+        : v,
     );
   }
 
   function cancelDrop() {
-    setComposer((c) =>
-      c.open ? { ...c, mode: "compose", capturedPoint: null } : c,
+    setView((v) =>
+      v.kind === "dropping" ? { kind: "compose", placeId: v.placeId } : v,
     );
   }
 
   function dropPoint(point: Point) {
-    setComposer((c) =>
-      c.open && c.mode === "dropping" ? { ...c, capturedPoint: point } : c,
+    setView((v) =>
+      v.kind === "dropping" && v.capturedPoint === null
+        ? { ...v, capturedPoint: point }
+        : v,
     );
   }
 
   function confirmNewPlace(name: string) {
-    if (!composer.open || composer.capturedPoint === null) return;
-    const id = addPlaceAtPoint(world.id, name, composer.capturedPoint);
-    if (id) {
-      setComposer({
-        open: true,
-        mode: "compose",
-        placeId: id,
-        capturedPoint: null,
-      });
-    }
+    if (view.kind !== "dropping" || view.capturedPoint === null) return;
+    const id = addPlaceAtPoint(world.id, name, view.capturedPoint);
+    if (id) setView({ kind: "compose", placeId: id });
   }
 
   async function handleSaveToFile() {
@@ -148,10 +107,8 @@ export function WorldView({ world }: { world: World }) {
     }
   }
 
-  const capturing =
-    composer.open &&
-    composer.mode === "dropping" &&
-    composer.capturedPoint === null;
+  const capturing = view.kind === "dropping" && view.capturedPoint === null;
+  const composerOpen = view.kind === "compose" || view.kind === "dropping";
 
   return (
     <div className="page">
@@ -185,9 +142,18 @@ export function WorldView({ world }: { world: World }) {
           world={world}
           dropping={capturing}
           onDropPoint={dropPoint}
-          onPickPlace={(placeId) => openCompose(placeId)}
-          pickable={!composer.open}
+          onPickPlace={openRecall}
+          pickable={view.kind === "none"}
         />
+
+        {showHint && (
+          <div className="hint-mark">
+            <p className="hint-mark__text">{copy.recall.hint}</p>
+            <button type="button" className="btn btn--ghost" onClick={dismissHint}>
+              {copy.recall.hintDismiss}
+            </button>
+          </div>
+        )}
 
         {showWriteDream && (
           <button
@@ -199,23 +165,31 @@ export function WorldView({ world }: { world: World }) {
           </button>
         )}
 
-        {world.places.length > 0 &&
-          world.places.map((place) => (
-            <PlaceCard key={place.id} place={place} world={world} />
-          ))}
+        {world.places.length > 0 && (
+          <VisitLedger index={index} onOpen={openRecall} />
+        )}
       </main>
 
-      {composer.open && (
+      {composerOpen && (
         <EntryComposer
           world={world}
-          placeId={composer.placeId}
-          mode={composer.mode}
-          capturedPoint={composer.capturedPoint}
+          placeId={view.placeId}
+          mode={view.kind === "dropping" ? "dropping" : "compose"}
+          capturedPoint={view.kind === "dropping" ? view.capturedPoint : null}
           onSelectPlace={selectPlace}
           onStartDrop={startDrop}
           onCancelDrop={cancelDrop}
           onConfirmNewPlace={confirmNewPlace}
-          onClose={closeComposer}
+          onSaved={openRecall}
+          onClose={closeSheet}
+        />
+      )}
+
+      {view.kind === "recall" && (
+        <RecallPanel
+          recall={index.get(view.placeId)}
+          onWriteHere={openCompose}
+          onClose={closeSheet}
         />
       )}
     </div>

@@ -20,7 +20,8 @@ import { addEntry } from "../state/atlasStore";
 // Body and date are local state, preserved across the "New place" drop detour
 // because the component stays mounted while the canvas captures the point.
 // Visibility, the selected place, and the drop mode are owned by WorldView so
-// the same sheet opens from the button and from a map marker tap.
+// the same sheet opens from the button and from the recall panel's "Write a
+// dream here" action.
 
 interface EntryComposerProps {
   world: World;
@@ -31,6 +32,9 @@ interface EntryComposerProps {
   onStartDrop: () => void;
   onCancelDrop: () => void;
   onConfirmNewPlace: (name: string) => void;
+  // Called after a successful save with the pinned place id, so the world
+  // view can open that place's recall panel in the same gesture.
+  onSaved: (placeId: string) => void;
   onClose: () => void;
 }
 
@@ -58,6 +62,7 @@ export function EntryComposer({
   onStartDrop,
   onCancelDrop,
   onConfirmNewPlace,
+  onSaved,
   onClose,
 }: EntryComposerProps) {
   const [body, setBody] = useState("");
@@ -130,7 +135,7 @@ export function EntryComposer({
   function handleSave() {
     if (!canSave || placeId === null) return;
     addEntry(world.id, placeId, date, body);
-    onClose();
+    onSaved(placeId);
   }
 
   function handleConfirmNewPlace() {

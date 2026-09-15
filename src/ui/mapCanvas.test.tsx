@@ -82,10 +82,9 @@ describe("MapCanvas", () => {
     const shape = currentShapes(world)[0];
     expect(shape.type).toBe("district");
     expect(shape.placeId).toBe(world.places[0].id);
-    // The place now answers in the EPIC 1 readout below the map.
-    expect(
-      screen.getByRole("heading", { name: "The Harbor" }),
-    ).toBeInTheDocument();
+    // The place now appears in the visit ledger below the map, ready for its
+    // first entry.
+    expect(screen.getByText(copy.worldView.placeNoEntries)).toBeInTheDocument();
   });
 
   it("commits a road as an open polyline with no name prompt", async () => {

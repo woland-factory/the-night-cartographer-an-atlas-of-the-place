@@ -66,7 +66,7 @@ describe("EntryComposer", () => {
     expect(chip).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("pins a typed dream to a picked place and appears immediately (optimistic)", async () => {
+  it("saves and the place answers back in the same gesture (answer-back)", async () => {
     const user = await openComposerWithFixture();
     await user.type(
       screen.getByLabelText(copy.composer.bodyLabel),
@@ -79,9 +79,51 @@ describe("EntryComposer", () => {
     const added = entries[entries.length - 1];
     expect(added.placeId).toBe("p1");
     expect(added.body).toBe("a lighthouse turning");
-    // The composer closed and the entry shows in the place readout at once.
+
+    // The composer closed and the recall panel opened in the same gesture,
+    // with the new entry on top, today's visit, and the incremented count.
+    expect(
+      screen.queryByRole("heading", { name: copy.composer.title }),
+    ).toBeNull();
+    const panel = screen.getByRole("dialog");
+    expect(
+      within(panel).getByRole("heading", { name: "The Harbor" }),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).getByText(`${copy.worldView.lastVisitPrefix} today`),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText("3 visits")).toBeInTheDocument();
+    const items = within(panel).getAllByRole("listitem");
+    expect(
+      within(items[0]).getByText("a lighthouse turning"),
+    ).toBeInTheDocument();
+  });
+
+  it("answers back with the first entry for a place with no history", async () => {
+    const user = await openComposerWithFixture();
+    await user.type(
+      screen.getByLabelText(copy.composer.bodyLabel),
+      "a stair into the fog",
+    );
+    await user.click(screen.getByRole("button", { name: "The Fog Stair" }));
+    await user.click(screen.getByRole("button", { name: copy.composer.save }));
+
+    const panel = screen.getByRole("dialog");
+    expect(
+      within(panel).getByRole("heading", { name: "The Fog Stair" }),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).getByText(copy.worldView.visitOne),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).getByText("a stair into the fog"),
+    ).toBeInTheDocument();
+  });
+
+  it("Escape cancels the composer without answering back", async () => {
+    const user = await openComposerWithFixture();
+    await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByText("a lighthouse turning")).toBeInTheDocument();
   });
 
   it("stores an edited date on the entry", async () => {
@@ -196,19 +238,30 @@ describe("EntryComposer", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens the composer pinned to a place when its marker is tapped", async () => {
+  it("opens recall on a marker tap and reaches the composer via Write a dream here", async () => {
     const user = userEvent.setup();
     importAtlas(fullAtlasFixture());
     render(<App />);
     // The Harbor (p1) has a point anchor, so its marker is on the map.
     await user.click(screen.getByRole("button", { name: "The Harbor" }));
 
-    // The composer opened; the tapped place is preselected.
+    // The map answered back with the place's history.
+    const panel = screen.getByRole("dialog");
+    expect(
+      within(panel).getByRole("heading", { name: "The Harbor" }),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).getByText("Same bench, older gulls."),
+    ).toBeInTheDocument();
+
+    // Recall and writing are one loop: the composer opens pinned here.
+    await user.click(
+      screen.getByRole("button", { name: copy.recall.writeHere }),
+    );
     expect(
       screen.getByRole("heading", { name: copy.composer.title }),
     ).toBeInTheDocument();
     const chips = screen.getAllByRole("button", { name: "The Harbor" });
-    // One of them is the pressed chip inside the dialog.
     expect(chips.some((c) => c.getAttribute("aria-pressed") === "true")).toBe(
       true,
     );

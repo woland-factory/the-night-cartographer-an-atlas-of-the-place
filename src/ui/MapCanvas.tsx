@@ -45,10 +45,11 @@ interface MapCanvasProps {
   dropping?: boolean;
   onDropPoint?: (point: Point) => void;
   // Called when a place marker is tapped while not mid-draw and not dropping, so
-  // the world view can open the composer already pinned to that place.
+  // the world view can open that place's recall panel (the map answers back).
   onPickPlace?: (placeId: string) => void;
-  // False while the composer is already open, so markers behind the modal are
-  // inert (never a duplicate focus target or a competing accessible name).
+  // False while a sheet (recall panel or composer) is already open, so markers
+  // behind the modal are inert (never a duplicate focus target or a competing
+  // accessible name).
   pickable?: boolean;
 }
 
