@@ -18,5 +18,6 @@ beforeEach(() => {
   __resetIdbForTests();
   __resetStoreForTests();
   __resetFileHandleForTests();
+  window.localStorage.clear();
   (window as unknown as { __NC_CONFIG__: unknown }).__NC_CONFIG__ = {};
 });

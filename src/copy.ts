@@ -108,6 +108,16 @@ export const copy = {
     emptyPlacesBody: "Drop a place on the map, then pin your dream to it.",
   },
 
+  recall: {
+    close: "Close",
+    writeHere: "Write a dream here",
+    emptyTitle: "The first dream goes here.",
+    emptyBody: "Pin a morning to this place. It remembers from then on.",
+    ledgerHeading: "Places",
+    hint: "Tap a place to see what you wrote there.",
+    hintDismiss: "Got it",
+  },
+
   saveError: {
     title: "Save your atlas to keep these changes.",
     body: "This device isn't storing new changes right now. Save your atlas to a file so you keep them.",
@@ -128,4 +138,11 @@ export const copy = {
 
 export function importErrorMessage(reason: ImportError): string {
   return copy.importError[reason];
+}
+
+// The one visit-count rule, shared by the recall panel and the visit ledger.
+export function visitsLabel(count: number): string {
+  return count === 1
+    ? copy.worldView.visitOne
+    : `${count} ${copy.worldView.visitManySuffix}`;
 }
