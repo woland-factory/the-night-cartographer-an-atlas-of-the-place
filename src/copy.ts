@@ -108,6 +108,14 @@ export const copy = {
     emptyPlacesBody: "Drop a place on the map, then pin your dream to it.",
   },
 
+  timeScrub: {
+    label: "Map history",
+    now: "Now",
+    backToNow: "Back to now",
+    viewingPrefix: "Map as of",
+    drawnPrefix: "Drawn",
+  },
+
   recall: {
     close: "Close",
     writeHere: "Write a dream here",

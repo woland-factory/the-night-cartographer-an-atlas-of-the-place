@@ -10,6 +10,7 @@ import { saveToFile } from "../persistence/file";
 import { EntryComposer } from "./EntryComposer";
 import { MapCanvas } from "./MapCanvas";
 import { RecallPanel } from "./RecallPanel";
+import { TimeScrub } from "./TimeScrub";
 import { VisitLedger } from "./VisitLedger";
 
 // Exactly one sheet is open at a time: the recall panel, the composer, or
@@ -23,8 +24,19 @@ type View =
 
 export function WorldView({ world }: { world: World }) {
   const [view, setView] = useState<View>({ kind: "none" });
+  // The viewed stratum index; null means "now" (the current map). Plain React
+  // state: scrubbing never calls the store, so no autosave is scheduled and the
+  // atlas object is untouched. WorldView is keyed by world.id in App, so this
+  // resets to now whenever the active world changes.
+  const [viewedStratum, setViewedStratum] = useState<number | null>(null);
   const [hintSeen, setHintSeen] = useState(() => hasSeenRecallHint());
   const saveStatus = useSaveStatus();
+
+  // The defensive `?? null` clamps a stale index to "now" rather than crashing.
+  const viewedShapes =
+    viewedStratum === null
+      ? null
+      : (world.strata[viewedStratum]?.shapes ?? null);
 
   // Built once per world identity and memoized: a tap never rebuilds it, so
   // opening recall is an O(1) lookup plus a render at any corpus size. Only
@@ -54,6 +66,11 @@ export function WorldView({ world }: { world: World }) {
   }
 
   function openCompose(placeId: string | null) {
+    // Every write lands on the current map: return to now before the composer
+    // opens. This one reset covers the world-view button, the recall panel's
+    // "Write a dream here", and the drop-a-new-place detour (reachable only from
+    // the composer).
+    setViewedStratum(null);
     setView({ kind: "compose", placeId });
   }
 
@@ -144,7 +161,16 @@ export function WorldView({ world }: { world: World }) {
           onDropPoint={dropPoint}
           onPickPlace={openRecall}
           pickable={view.kind === "none"}
+          viewedShapes={viewedShapes}
         />
+
+        {world.strata.length > 0 && (
+          <TimeScrub
+            strata={world.strata}
+            value={viewedStratum}
+            onScrub={setViewedStratum}
+          />
+        )}
 
         {showHint && (
           <div className="hint-mark">

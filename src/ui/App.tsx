@@ -25,5 +25,11 @@ export function App() {
   const active =
     atlas.worlds.find((w) => w.id === atlas.settings.activeWorldId) ?? null;
 
-  return active ? <WorldView world={active} /> : <WorldList atlas={atlas} />;
+  // Keyed by world id so per-world view state (the open sheet, the time scrub
+  // position) resets when the active world changes.
+  return active ? (
+    <WorldView key={active.id} world={active} />
+  ) : (
+    <WorldList atlas={atlas} />
+  );
 }

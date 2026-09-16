@@ -508,6 +508,119 @@ h2 {
   margin: var(--space-1) 0 var(--space-2);
 }
 
+/* Time scrub: one labeled rail under the map that replays the world's dated
+   strata. Mobile-first, spans the map width, thumb hit area >= 44px. */
+.time-scrub {
+  margin: 0 0 var(--space-3);
+}
+
+.time-scrub__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.time-scrub__label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.time-scrub__readout {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.time-scrub__range {
+  display: block;
+  width: 100%;
+  height: var(--touch);
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.time-scrub__range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+
+/* The visible rail is a thin track; the thumb carries a 44px transparent hit
+   area so the touch target is comfortable without a bulky visual. */
+.time-scrub__range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.time-scrub__range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.time-scrub__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--touch);
+  height: var(--touch);
+  margin-top: calc((4px - var(--touch)) / 2);
+  border-radius: 50%;
+  border: none;
+  background:
+    radial-gradient(
+      circle,
+      var(--accent) 0,
+      var(--accent) 9px,
+      transparent 10px
+    );
+}
+
+.time-scrub__range::-moz-range-thumb {
+  width: var(--touch);
+  height: var(--touch);
+  border-radius: 50%;
+  border: none;
+  background:
+    radial-gradient(
+      circle,
+      var(--accent) 0,
+      var(--accent) 9px,
+      transparent 10px
+    );
+}
+
+/* Single stratum: a single marked point on the rail, nothing draggable. */
+.time-scrub__rail--single {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin: calc((var(--touch) - 4px) / 2) 0;
+}
+
+.time-scrub__point {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-50%);
+}
+
+.time-scrub__back {
+  margin-top: var(--space-1);
+}
+
 .map-panel {
   background: var(--surface);
   border: 1px solid var(--border);

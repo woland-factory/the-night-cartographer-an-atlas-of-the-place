@@ -51,6 +51,11 @@ interface MapCanvasProps {
   // behind the modal are inert (never a duplicate focus target or a competing
   // accessible name).
   pickable?: boolean;
+  // When set, the canvas shows this past snapshot read-only: these shapes render
+  // instead of the current stratum's, the kit and drawing interactions are
+  // suppressed, and only place markers stay interactive. Null/undefined keeps
+  // the shipped live-editing behavior.
+  viewedShapes?: Shape[] | null;
 }
 
 // The drawing surface plus its toolbar. Draw-tool selection, in-progress
@@ -62,6 +67,7 @@ export function MapCanvas({
   onDropPoint,
   onPickPlace,
   pickable = true,
+  viewedShapes = null,
 }: MapCanvasProps) {
   const [tool, setTool] = useState<ShapeType>("district");
   const [token, setToken] = useState<PaletteToken>("ink");
@@ -77,12 +83,18 @@ export function MapCanvas({
   const hintId = useId();
   const canvasRef = useRef<SVGSVGElement>(null);
   const kind = toolFor(tool).kind;
-  const shapes = currentShapes(world);
+  // Viewing a past stratum is read-only: render its snapshot, hide the kit, and
+  // let no tap commit. Live editing always renders the current stratum.
+  const viewing = viewedShapes !== null;
+  const shapes = viewing ? viewedShapes : currentShapes(world);
   const busy = pendingDistrict !== null || pendingLabel !== null;
   const drawing = vertices.length > 0;
   const canFinish = kind === "area" ? vertices.length >= 3 : vertices.length >= 2;
   const canUndo = world.strata.length > 0;
-  const showEmpty = shapes.length === 0 && !drawing && !busy && !dropping;
+  // A sparse past is history, not an invitation: the empty CTA never shows while
+  // viewing a stratum, even an empty one.
+  const showEmpty =
+    !viewing && shapes.length === 0 && !drawing && !busy && !dropping;
   // A marker answers a tap only when nothing is being drawn, named, or dropped,
   // so it never fights the drawing surface or the point-capture gesture.
   const canPick = pickable && !drawing && !busy && !dropping;
@@ -106,6 +118,8 @@ export function MapCanvas({
 
   // A tap or a keyboard Enter both place at a point in canvas space.
   function placeAt(p: Point) {
+    // The past is read-only: no vertex, no stamp, no label, no commit.
+    if (viewing) return;
     // Drop mode is a one-shot capture: the point becomes a place, not a vertex.
     if (dropping) {
       onDropPoint?.(p);
@@ -292,7 +306,7 @@ export function MapCanvas({
             </g>
           )}
 
-          {!busy && (focused || drawing || dropping) && (
+          {!viewing && !busy && (focused || drawing || dropping) && (
             <g className="reticle" aria-hidden="true">
               <circle cx={reticle.x} cy={reticle.y} r={12} />
               <line
@@ -399,21 +413,23 @@ export function MapCanvas({
         </form>
       )}
 
-      <MapKit
-        tool={tool}
-        onSelectTool={selectTool}
-        token={token}
-        onSelectToken={setToken}
-        stamp={stamp}
-        onSelectStamp={setStamp}
-        drawing={drawing}
-        canFinish={canFinish}
-        onFinish={finish}
-        onUndoPoint={() => setVertices((prev) => prev.slice(0, -1))}
-        onCancel={() => setVertices([])}
-        canUndo={canUndo}
-        onUndo={() => undoLastEdit(world.id)}
-      />
+      {!viewing && (
+        <MapKit
+          tool={tool}
+          onSelectTool={selectTool}
+          token={token}
+          onSelectToken={setToken}
+          stamp={stamp}
+          onSelectStamp={setStamp}
+          drawing={drawing}
+          canFinish={canFinish}
+          onFinish={finish}
+          onUndoPoint={() => setVertices((prev) => prev.slice(0, -1))}
+          onCancel={() => setVertices([])}
+          canUndo={canUndo}
+          onUndo={() => undoLastEdit(world.id)}
+        />
+      )}
     </div>
   );
 }
