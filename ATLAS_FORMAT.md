@@ -77,7 +77,8 @@ One dated map revision. Editing the map appends a new stratum instead of
 changing an old one (the palimpsest): every committed edit writes a full
 snapshot of the map at that revision, and prior strata are never changed or
 removed. `currentStratumId` on the world points at the newest, and `derivedFrom`
-links each stratum to the one it grew from. The revision history grows the file
+links each stratum to the one it grew from. Array order is commit order, which
+is the order the map history replays in. The revision history grows the file
 over time. That accumulation is the point of the tool, not a leak: the reader
 only ever draws the current stratum, so drawing stays fast no matter how long
 the history gets.
