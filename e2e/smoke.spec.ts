@@ -46,3 +46,39 @@ test("a visitor writes a dream and the place answers back at once", async ({
   await expect(panel.getByText(dream)).toBeVisible();
   await expect(panel.getByText(/Last visit here: today/)).toBeVisible();
 });
+
+// The time scrub replays the sample world's dated strata, and recall keeps
+// answering while the geography changes underfoot.
+test("a visitor scrubs the sample map back through its dated strata", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open the sample atlas" }).click();
+
+  const fogStairLabel = page
+    .locator(".map-label")
+    .filter({ hasText: "The Fog Stair" });
+  await expect(fogStairLabel).toBeVisible();
+
+  // Scrub to the oldest survey with the keyboard.
+  const scrub = page.getByRole("slider", { name: "Map history" });
+  await scrub.focus();
+  await scrub.press("Home");
+
+  await expect(page.getByText("Map as of 2 November 2019")).toBeVisible();
+  // The Fog Stair district and its label did not exist in 2019.
+  await expect(fogStairLabel).toHaveCount(0);
+
+  // Recall still answers in full while the past map is shown.
+  await page.getByRole("button", { name: "The Harbor", exact: true }).click();
+  const harbor = page.getByRole("dialog");
+  await expect(
+    harbor.getByText(/the gulls remembered me first/i),
+  ).toBeVisible();
+  await harbor.getByRole("button", { name: "Close" }).click();
+
+  // Back to now restores the current map exactly.
+  await page.getByRole("button", { name: "Back to now" }).click();
+  await expect(fogStairLabel).toBeVisible();
+  await expect(page.getByText("Now", { exact: true })).toBeVisible();
+});

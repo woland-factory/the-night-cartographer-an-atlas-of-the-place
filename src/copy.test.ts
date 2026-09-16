@@ -84,6 +84,8 @@ describe("copy sweep", () => {
     ...world.strata.flatMap((s) =>
       s.shapes.map((shape) => shape.text ?? "").filter(Boolean),
     ),
+    // Stratum labels ship in the file the user owns; sweep them too.
+    ...world.strata.map((s) => s.label ?? "").filter(Boolean),
   ];
   const allProductStrings = [...uiStrings, ...demoStrings];
 

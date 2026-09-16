@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { copy } from "../copy";
-import type { World } from "../model/atlas";
+import type { Shape, World } from "../model/atlas";
 import { currentShapes } from "../model/strata";
 import { addWorld, getState, init, openWorld } from "../state/atlasStore";
 import { App } from "./App";
@@ -230,5 +230,96 @@ describe("MapCanvas place markers and drop mode", () => {
     fireEvent.keyDown(c, { key: "Enter" }); // reticle at center
 
     expect(onDropPoint).toHaveBeenCalledWith({ x: 500, y: 500 });
+  });
+});
+
+// A world whose current stratum carries a distinct label, so a viewed-mode
+// render can be told apart from the live one.
+function worldWithCurrentLabel(): World {
+  return {
+    id: "w1",
+    name: "Harbor City",
+    createdAt: "2020-01-01T00:00:00.000Z",
+    places: [
+      {
+        id: "p1",
+        name: "The Harbor",
+        anchor: { x: 500, y: 500 },
+        createdAt: "2020-01-01T00:00:00.000Z",
+      },
+    ],
+    strata: [
+      {
+        id: "st1",
+        createdAt: "2020-01-01T00:00:00.000Z",
+        derivedFrom: null,
+        shapes: [
+          {
+            id: "cur",
+            type: "label",
+            geometry: "100,100",
+            styleToken: "ink",
+            text: "CURRENT",
+          },
+        ],
+      },
+    ],
+    currentStratumId: "st1",
+    entries: [],
+  };
+}
+
+const pastLabel: Shape = {
+  id: "past",
+  type: "label",
+  geometry: "200,200",
+  styleToken: "ink",
+  text: "PAST",
+};
+
+describe("MapCanvas viewed-shapes (read-only past)", () => {
+  it("renders the viewed snapshot, not the current stratum's shapes", () => {
+    render(
+      <MapCanvas world={worldWithCurrentLabel()} viewedShapes={[pastLabel]} />,
+    );
+    expect(screen.getByText("PAST")).toBeInTheDocument();
+    expect(screen.queryByText("CURRENT")).toBeNull();
+  });
+
+  it("hides the map kit while viewing the past", () => {
+    render(
+      <MapCanvas world={worldWithCurrentLabel()} viewedShapes={[pastLabel]} />,
+    );
+    expect(screen.queryByRole("button", { name: copy.map.tools.road })).toBeNull();
+    expect(screen.queryByRole("button", { name: copy.map.undo })).toBeNull();
+  });
+
+  it("commits nothing on a canvas tap and starts no drawing", () => {
+    const { container } = render(
+      <MapCanvas world={worldWithCurrentLabel()} viewedShapes={[pastLabel]} />,
+    );
+    mockCanvasRect();
+    fireEvent.click(canvas(), { clientX: 300, clientY: 400 });
+    // No in-progress vertex preview appeared: the tap placed nothing.
+    expect(container.querySelector(".preview")).toBeNull();
+  });
+
+  it("shows no empty CTA for an empty viewed snapshot", () => {
+    render(<MapCanvas world={worldWithCurrentLabel()} viewedShapes={[]} />);
+    expect(screen.queryByText(copy.map.empty.title)).toBeNull();
+  });
+
+  it("keeps place markers live and picks a place on tap", async () => {
+    const user = userEvent.setup();
+    const onPickPlace = vi.fn();
+    render(
+      <MapCanvas
+        world={worldWithCurrentLabel()}
+        viewedShapes={[pastLabel]}
+        onPickPlace={onPickPlace}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "The Harbor" }));
+    expect(onPickPlace).toHaveBeenCalledWith("p1");
   });
 });

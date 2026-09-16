@@ -1,0 +1,167 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
+import { copy } from "../copy";
+import type { World } from "../model/atlas";
+import { currentShapes } from "../model/strata";
+import { SAMPLE_WORLD_ID } from "../data/demoAtlas";
+import { addWorld, getState, init, openWorld } from "../state/atlasStore";
+import { App } from "./App";
+import { WorldView } from "./WorldView";
+
+function setConfig(config: Record<string, string>) {
+  (window as unknown as { __NC_CONFIG__: unknown }).__NC_CONFIG__ = config;
+}
+
+async function openSampleWorld() {
+  setConfig({ SEED_DEMO: "1" });
+  await init();
+  render(<App />);
+}
+
+function sampleWorld(): World {
+  const atlas = getState();
+  const w = atlas?.worlds.find((x) => x.id === SAMPLE_WORLD_ID);
+  if (!w) throw new Error("no sample world");
+  return w;
+}
+
+function scrub() {
+  return screen.getByRole("slider", { name: copy.timeScrub.label });
+}
+
+function mapCanvas() {
+  return screen.getByRole("application", { name: copy.map.canvasLabel });
+}
+
+describe("WorldView time scrub", () => {
+  it("replays the geography and restores Now exactly", async () => {
+    await openSampleWorld();
+
+    // The Fog Stair map label exists only in the newest stratum.
+    expect(within(mapCanvas()).getByText("The Fog Stair")).toBeInTheDocument();
+
+    // Scrub to the oldest survey: the newest-only label is gone.
+    fireEvent.change(scrub(), { target: { value: "0" } });
+    expect(
+      screen.getByText(`${copy.timeScrub.viewingPrefix} 2 November 2019`),
+    ).toBeInTheDocument();
+    expect(within(mapCanvas()).queryByText("The Fog Stair")).toBeNull();
+
+    // Back to Now renders the current stratum exactly.
+    fireEvent.click(
+      screen.getByRole("button", { name: copy.timeScrub.backToNow }),
+    );
+    expect(screen.getByText(copy.timeScrub.now)).toBeInTheDocument();
+    expect(within(mapCanvas()).getByText("The Fog Stair")).toBeInTheDocument();
+  });
+
+  it("never writes to the store while scrubbing", async () => {
+    await openSampleWorld();
+
+    const before = getState();
+    const strataBefore = structuredClone(sampleWorld().strata);
+
+    fireEvent.change(scrub(), { target: { value: "0" } });
+    fireEvent.change(scrub(), { target: { value: "1" } });
+    fireEvent.change(scrub(), { target: { value: "2" } });
+
+    // No store mutation ran: the atlas object is the very same reference and
+    // the strata are untouched.
+    expect(getState()).toBe(before);
+    expect(sampleWorld().strata).toEqual(strataBefore);
+    // And Now still renders the current shapes exactly.
+    const now = currentShapes(sampleWorld());
+    expect(now.length).toBeGreaterThan(0);
+  });
+
+  it("answers recall in full while viewing the past (association by placeId)", async () => {
+    const user = userEvent.setup();
+    await openSampleWorld();
+
+    fireEvent.change(scrub(), { target: { value: "0" } });
+
+    // The Harbor answers with its whole history, including the 2025 entry.
+    await user.click(screen.getByRole("button", { name: "The Harbor" }));
+    const harbor = screen.getByRole("dialog");
+    expect(
+      within(harbor).getByText(/the gulls remembered me first/i),
+    ).toBeInTheDocument();
+    expect(within(harbor).getByText("4 visits")).toBeInTheDocument();
+    await user.click(within(harbor).getByRole("button", { name: copy.recall.close }));
+
+    // A place whose district only exists in a later stratum still answers in
+    // full while the 2019 map is shown.
+    await user.click(screen.getByRole("button", { name: "The Clockmarket" }));
+    const clock = screen.getByRole("dialog");
+    expect(
+      within(clock).getByText(/every clock told a different hour/i),
+    ).toBeInTheDocument();
+  });
+
+  it("returns to Now when the composer opens, and saves at Now", async () => {
+    const user = userEvent.setup();
+    await openSampleWorld();
+
+    fireEvent.change(scrub(), { target: { value: "0" } });
+    expect(
+      screen.getByText(`${copy.timeScrub.viewingPrefix} 2 November 2019`),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: copy.composer.open }),
+    );
+
+    // Opening the composer reset the scrub to Now.
+    expect(scrub()).toHaveValue("2");
+
+    const dream = "a lantern under the pier";
+    await user.type(screen.getByLabelText(copy.composer.bodyLabel), dream);
+    const composer = screen.getByRole("dialog");
+    await user.click(
+      within(composer).getByRole("button", { name: "The Harbor" }),
+    );
+    await user.click(within(composer).getByRole("button", { name: copy.composer.save }));
+
+    // The place answers back with the new entry.
+    const panel = screen.getByRole("dialog");
+    expect(within(panel).getByText(dream)).toBeInTheDocument();
+  });
+
+  it("hides the scrub on a world with no strata", async () => {
+    setConfig({});
+    await init();
+    addWorld("Fresh World");
+    openWorld(getState()!.worlds[0].id);
+    render(<App />);
+
+    expect(screen.queryByText(copy.timeScrub.label)).toBeNull();
+    expect(screen.queryByRole("slider")).toBeNull();
+  });
+
+  it("shows the single-point state on a world with one stratum", () => {
+    const world: World = {
+      id: "w1",
+      name: "One Survey",
+      createdAt: "2019-11-02T07:12:00.000Z",
+      places: [],
+      strata: [
+        {
+          id: "st1",
+          createdAt: "2019-11-02T07:12:00.000Z",
+          label: "first survey",
+          derivedFrom: null,
+          shapes: [],
+        },
+      ],
+      currentStratumId: "st1",
+      entries: [],
+    };
+    render(<WorldView world={world} />);
+
+    expect(screen.queryByRole("slider")).toBeNull();
+    expect(
+      screen.getByText(`${copy.timeScrub.drawnPrefix} 2 November 2019`),
+    ).toBeInTheDocument();
+  });
+});
