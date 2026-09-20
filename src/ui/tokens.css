@@ -332,8 +332,9 @@ h2 {
   font-size: 13px;
 }
 
-/* First-recall coach mark: one sentence pointing at the signature moment */
-.hint-mark {
+/* Guided walk: one imperative sentence pinned to the control that matters
+   right now, plus a subordinate Skip. */
+.walk {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -345,9 +346,50 @@ h2 {
   margin: var(--space-2) 0 0;
 }
 
-.hint-mark__text {
+.walk__text {
   margin: 0;
   font-size: 14px;
+}
+
+/* Skip stays visibly subordinate to any nearby primary action. */
+.walk__skip {
+  flex: 0 0 auto;
+  min-height: var(--touch);
+}
+
+/* Anchor emphasis: a static ring on the one control the walk points at, so the
+   highlighted next step is literal. Static by default (no looping motion). */
+[data-walk-anchor] {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius);
+}
+
+.map-markers[data-walk-anchor="recall"] .map-marker__ring {
+  stroke: var(--accent);
+  stroke-opacity: 1;
+  stroke-width: 3;
+}
+
+.map-markers[data-walk-anchor="recall"] .map-marker__dot {
+  fill: var(--accent);
+  fill-opacity: 1;
+}
+
+/* A single subtle pulse is the ceiling, and only when motion is welcome. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-walk-anchor] {
+    animation: walk-pulse 1.8s ease-in-out 3;
+  }
+  @keyframes walk-pulse {
+    0%,
+    100% {
+      outline-offset: 3px;
+    }
+    50% {
+      outline-offset: 6px;
+    }
+  }
 }
 
 .banner {

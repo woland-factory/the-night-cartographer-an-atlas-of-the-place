@@ -24,6 +24,7 @@ import {
 } from "../state/atlasStore";
 import { MapKit } from "./MapKit";
 import { MapDefs, renderShape } from "./mapRender";
+import type { WalkStep } from "./Walkthrough";
 
 const RETICLE_STEP = 20;
 const RETICLE_STEP_LARGE = 100;
@@ -56,6 +57,11 @@ interface MapCanvasProps {
   // suppressed, and only place markers stay interactive. Null/undefined keeps
   // the shipped live-editing behavior.
   viewedShapes?: Shape[] | null;
+  // The guided walk's current step, so the canvas can emphasize the one control
+  // the walk points at: "draw" highlights the empty-state CTA, "recall"
+  // highlights the place markers. Null/undefined (the default) leaves every
+  // existing behavior identical.
+  walkAnchor?: WalkStep | null;
 }
 
 // The drawing surface plus its toolbar. Draw-tool selection, in-progress
@@ -68,6 +74,7 @@ export function MapCanvas({
   onPickPlace,
   pickable = true,
   viewedShapes = null,
+  walkAnchor = null,
 }: MapCanvasProps) {
   const [tool, setTool] = useState<ShapeType>("district");
   const [token, setToken] = useState<PaletteToken>("ink");
@@ -256,6 +263,10 @@ export function MapCanvas({
           {shapes.map(renderShape)}
           {pendingDistrict && renderShape(pendingDistrict)}
 
+          <g
+            className="map-markers"
+            data-walk-anchor={walkAnchor === "recall" ? "recall" : undefined}
+          >
           {world.places.map((place) => {
             const anchor = place.anchor;
             if (!anchor || !("x" in anchor)) return null; // shapeRef/null: no marker
@@ -290,6 +301,7 @@ export function MapCanvas({
               </g>
             );
           })}
+          </g>
 
           {drawing && (
             <g className="preview" aria-hidden="true">
@@ -332,6 +344,7 @@ export function MapCanvas({
             <button
               type="button"
               className="btn btn--primary"
+              data-walk-anchor={walkAnchor === "draw" ? "draw" : undefined}
               onClick={() => {
                 selectTool("district");
                 canvasRef.current?.focus();

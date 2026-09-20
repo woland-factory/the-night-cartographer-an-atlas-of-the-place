@@ -122,8 +122,13 @@ export const copy = {
     emptyTitle: "The first dream goes here.",
     emptyBody: "Pin a morning to this place. It remembers from then on.",
     ledgerHeading: "Places",
-    hint: "Tap a place to see what you wrote there.",
-    hintDismiss: "Got it",
+  },
+
+  walkthrough: {
+    draw: "Draw a district.",
+    write: "Write a dream and pin it to a place.",
+    recall: "Tap a place to see what you wrote there.",
+    skip: "Skip",
   },
 
   saveError: {
