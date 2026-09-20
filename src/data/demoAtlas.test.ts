@@ -54,4 +54,17 @@ describe("demo sample-world strata", () => {
     expect(ids).not.toContain("sample-shape-fogstair-district");
     expect(ids).not.toContain("sample-shape-fog-edge");
   });
+
+  it("gives The Harbor multiple dated entries across several years, so recall answers back", () => {
+    const world = demoWorld();
+    const harbor = world.places.find((p) => p.name === "The Harbor");
+    expect(harbor).toBeDefined();
+
+    const harborEntries = world.entries.filter((e) => e.placeId === harbor!.id);
+    // Recall demonstrates elapsed history only if there is real history to show.
+    expect(harborEntries.length).toBeGreaterThanOrEqual(2);
+
+    const years = new Set(harborEntries.map((e) => e.date.slice(0, 4)));
+    expect(years.size).toBeGreaterThanOrEqual(2);
+  });
 });

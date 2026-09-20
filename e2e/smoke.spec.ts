@@ -47,6 +47,31 @@ test("a visitor writes a dream and the place answers back at once", async ({
   await expect(panel.getByText(/Last visit here: today/)).toBeVisible();
 });
 
+// The guided walk on a first run: the sample enters at the recall step, and
+// tapping a place that answers back retires the walk for good.
+test("a first-run visitor sees the recall step, then it retires after a real answer", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open the sample atlas" }).click();
+
+  // The pre-drawn sample lands on the walk's final step.
+  await expect(
+    page.getByText("Tap a place to see what you wrote there."),
+  ).toBeVisible();
+
+  // Tap The Harbor: the map answers back with its history.
+  await page.getByRole("button", { name: "The Harbor", exact: true }).click();
+  const panel = page.getByRole("dialog");
+  await expect(panel.getByText(/the gulls remembered me first/i)).toBeVisible();
+  await panel.getByRole("button", { name: "Close" }).click();
+
+  // The first success retired the walk.
+  await expect(
+    page.getByText("Tap a place to see what you wrote there."),
+  ).toHaveCount(0);
+});
+
 // The time scrub replays the sample world's dated strata, and recall keeps
 // answering while the geography changes underfoot.
 test("a visitor scrubs the sample map back through its dated strata", async ({

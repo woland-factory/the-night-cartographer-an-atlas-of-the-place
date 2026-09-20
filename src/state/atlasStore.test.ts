@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { placeLedger } from "../model/ledger";
 import { fullAtlasFixture } from "../test/fixtures";
+import { SAMPLE_WORLD_ID } from "../data/demoAtlas";
 import * as idb from "../persistence/idb";
 import {
   addEntry,
   addPlaceAtPoint,
+  addWorld,
   commitShape,
   getSaveStatus,
   getState,
   importAtlas,
+  openSample,
 } from "./atlasStore";
 
 function world() {
@@ -99,6 +102,47 @@ describe("entries survive later map revisions (recall foundation)", () => {
     expect(after.entries.some((e) => e.body === "the pier at low tide")).toBe(
       true,
     );
+  });
+});
+
+describe("openSample never overwrites the user's own worlds (AC 4)", () => {
+  it("adds the sample alongside an existing world and marks it as a sample", () => {
+    importAtlas(fullAtlasFixture());
+    const ownWorld = world();
+    const ownCount = getState()!.worlds.length;
+
+    openSample();
+
+    const worlds = getState()!.worlds;
+    // The user's own world is still present, untouched.
+    expect(worlds.some((w) => w.id === ownWorld.id)).toBe(true);
+    expect(worlds).toHaveLength(ownCount + 1);
+    // The sample is added and flagged so it can never pass for the user's file.
+    const sample = worlds.find((w) => w.id === SAMPLE_WORLD_ID);
+    expect(sample?.isSample).toBe(true);
+    // Opening the sample makes it the active world.
+    expect(getState()!.settings.activeWorldId).toBe(SAMPLE_WORLD_ID);
+  });
+
+  it("is idempotent: calling it twice never duplicates the sample", () => {
+    importAtlas(fullAtlasFixture());
+    openSample();
+    openSample();
+    const samples = getState()!.worlds.filter((w) => w.id === SAMPLE_WORLD_ID);
+    expect(samples).toHaveLength(1);
+  });
+
+  it("keeps the sample and any real world distinct (New world adds a non-sample)", () => {
+    importAtlas(fullAtlasFixture());
+    openSample();
+    addWorld("My City");
+
+    const worlds = getState()!.worlds;
+    const sample = worlds.find((w) => w.id === SAMPLE_WORLD_ID);
+    const mine = worlds.find((w) => w.name === "My City");
+    expect(sample?.isSample).toBe(true);
+    expect(mine).toBeDefined();
+    expect(mine!.isSample).toBeUndefined();
   });
 });
 

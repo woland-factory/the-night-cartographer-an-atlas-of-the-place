@@ -53,39 +53,51 @@ describe("SEED_DEMO seeding", () => {
   });
 });
 
-describe("first-recall coach mark", () => {
-  it("points at the tap once, then never again after the first recall open", async () => {
+describe("guided walk on the seeded sample", () => {
+  it("enters at the recall step, since the sample map is already drawn", async () => {
+    setConfig({ SEED_DEMO: "1" });
+    await init();
+    render(<App />);
+
+    // The pre-drawn sample has entries, so the walk starts at its final step:
+    // the map is already here, tap it.
+    expect(screen.getByText(copy.walkthrough.recall)).toBeInTheDocument();
+    expect(screen.queryByText(copy.walkthrough.draw)).toBeNull();
+    expect(screen.queryByText(copy.walkthrough.write)).toBeNull();
+    // And the sample is clearly chip-marked in the world view.
+    expect(screen.getByText(copy.worldView.sampleMarker)).toBeInTheDocument();
+  });
+
+  it("retires after the first answering recall, and never returns", async () => {
     setConfig({ SEED_DEMO: "1" });
     await init();
     const user = userEvent.setup();
     const { unmount } = render(<App />);
 
-    expect(screen.getByText(copy.recall.hint)).toBeInTheDocument();
+    expect(screen.getByText(copy.walkthrough.recall)).toBeInTheDocument();
 
-    // The first recall open retires the hint for good.
+    // Tapping a place that answers back is the first success.
     await user.click(screen.getByRole("button", { name: "The Harbor" }));
     await user.click(screen.getByRole("button", { name: copy.recall.close }));
-    expect(screen.queryByText(copy.recall.hint)).toBeNull();
+    expect(screen.queryByText(copy.walkthrough.recall)).toBeNull();
 
     // A returning user never sees it.
     unmount();
     render(<App />);
-    expect(screen.queryByText(copy.recall.hint)).toBeNull();
+    expect(screen.queryByText(copy.walkthrough.recall)).toBeNull();
   });
 
-  it("dismisses with Got it and stays dismissed", async () => {
+  it("retires on Skip and stays retired", async () => {
     setConfig({ SEED_DEMO: "1" });
     await init();
     const user = userEvent.setup();
     const { unmount } = render(<App />);
 
-    await user.click(
-      screen.getByRole("button", { name: copy.recall.hintDismiss }),
-    );
-    expect(screen.queryByText(copy.recall.hint)).toBeNull();
+    await user.click(screen.getByRole("button", { name: copy.walkthrough.skip }));
+    expect(screen.queryByText(copy.walkthrough.recall)).toBeNull();
 
     unmount();
     render(<App />);
-    expect(screen.queryByText(copy.recall.hint)).toBeNull();
+    expect(screen.queryByText(copy.walkthrough.recall)).toBeNull();
   });
 });

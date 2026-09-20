@@ -139,6 +139,124 @@ describe("WorldView time scrub", () => {
     expect(screen.queryByRole("slider")).toBeNull();
   });
 
+  it("walks a brand-new world draw -> write -> recall, ending on a real answer", async () => {
+    const user = userEvent.setup();
+    setConfig({});
+    await init();
+    addWorld("Dream City");
+    openWorld(getState()!.worlds[0].id);
+    const { container, unmount } = render(<App />);
+
+    // Step draw: a blank world shows the draw line, anchored to the map CTA.
+    expect(screen.getByText(copy.walkthrough.draw)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: copy.map.empty.action }),
+    ).toHaveAttribute("data-walk-anchor", "draw");
+
+    // Draw and name a district by keyboard: this mints the first place.
+    const c = mapCanvas();
+    c.focus();
+    fireEvent.keyDown(c, { key: "Enter" }); // (500,500)
+    fireEvent.keyDown(c, { key: "ArrowRight" });
+    fireEvent.keyDown(c, { key: "Enter" }); // (520,500)
+    fireEvent.keyDown(c, { key: "ArrowDown" });
+    fireEvent.keyDown(c, { key: "Enter" }); // (520,520)
+    await user.click(screen.getByRole("button", { name: copy.map.finish }));
+    await user.type(screen.getByLabelText(copy.map.nameLabel), "The Harbor");
+    await user.click(screen.getByRole("button", { name: copy.map.nameConfirm }));
+
+    // Step write: the walk self-ticked, anchored to the "Write a dream" button.
+    expect(screen.getByText(copy.walkthrough.write)).toBeInTheDocument();
+    const writeButton = screen.getByRole("button", { name: copy.composer.open });
+    expect(writeButton).toHaveAttribute("data-walk-anchor", "write");
+
+    // Write a dream pinned to that place and save it.
+    await user.click(writeButton);
+    const dream = "a lantern under the pier";
+    await user.type(screen.getByLabelText(copy.composer.bodyLabel), dream);
+    const composer = screen.getByRole("dialog");
+    await user.click(within(composer).getByRole("button", { name: "The Harbor" }));
+    await user.click(
+      within(composer).getByRole("button", { name: copy.composer.save }),
+    );
+
+    // The save opened the panel to show the fresh answer. Closing it leaves the
+    // walk waiting on the user's own deliberate tap.
+    const savedPanel = screen.getByRole("dialog");
+    expect(within(savedPanel).getByText(dream)).toBeInTheDocument();
+    await user.click(
+      within(savedPanel).getByRole("button", { name: copy.recall.close }),
+    );
+
+    // Step recall: the walk self-ticked, anchored to the place markers.
+    expect(screen.getByText(copy.walkthrough.recall)).toBeInTheDocument();
+    expect(
+      container.querySelector('.map-markers[data-walk-anchor="recall"]'),
+    ).not.toBeNull();
+
+    // Tap the place: the map answers back and the walk ends on that answer.
+    await user.click(screen.getByRole("button", { name: "The Harbor" }));
+    const panel = screen.getByRole("dialog");
+    expect(within(panel).getByText(dream)).toBeInTheDocument();
+    await user.click(
+      within(panel).getByRole("button", { name: copy.recall.close }),
+    );
+    expect(screen.queryByText(copy.walkthrough.recall)).toBeNull();
+
+    // A returning user never sees the walk again.
+    unmount();
+    render(<App />);
+    expect(screen.queryByText(copy.walkthrough.draw)).toBeNull();
+    expect(screen.queryByText(copy.walkthrough.write)).toBeNull();
+    expect(screen.queryByText(copy.walkthrough.recall)).toBeNull();
+  });
+
+  it("keeps the walk hidden while a sheet is open, and Skip retires it at any step", async () => {
+    const user = userEvent.setup();
+    setConfig({});
+    await init();
+    addWorld("Dream City");
+    openWorld(getState()!.worlds[0].id);
+    render(<App />);
+
+    // On the draw step, opening no sheet: the walk is visible.
+    expect(screen.getByText(copy.walkthrough.draw)).toBeInTheDocument();
+
+    // Skip at the very first step retires the whole walk.
+    await user.click(screen.getByRole("button", { name: copy.walkthrough.skip }));
+    expect(screen.queryByText(copy.walkthrough.draw)).toBeNull();
+  });
+
+  it("does not complete the walk when an empty place is tapped", async () => {
+    const user = userEvent.setup();
+    setConfig({});
+    await init();
+    addWorld("Dream City");
+    openWorld(getState()!.worlds[0].id);
+    render(<App />);
+
+    // Draw and name a district: a place with no entries yet.
+    const c = mapCanvas();
+    c.focus();
+    fireEvent.keyDown(c, { key: "Enter" });
+    fireEvent.keyDown(c, { key: "ArrowRight" });
+    fireEvent.keyDown(c, { key: "Enter" });
+    fireEvent.keyDown(c, { key: "ArrowDown" });
+    fireEvent.keyDown(c, { key: "Enter" });
+    await user.click(screen.getByRole("button", { name: copy.map.finish }));
+    await user.type(screen.getByLabelText(copy.map.nameLabel), "The Harbor");
+    await user.click(screen.getByRole("button", { name: copy.map.nameConfirm }));
+
+    // The walk is at write. Tap the empty place: recall opens its empty state.
+    expect(screen.getByText(copy.walkthrough.write)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "The Harbor" }));
+    expect(screen.getByText(copy.recall.emptyTitle)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: copy.recall.close }));
+
+    // The signature moment has not happened, so the walk is still there.
+    expect(screen.getByText(copy.walkthrough.write)).toBeInTheDocument();
+  });
+
   it("shows the single-point state on a world with one stratum", () => {
     const world: World = {
       id: "w1",

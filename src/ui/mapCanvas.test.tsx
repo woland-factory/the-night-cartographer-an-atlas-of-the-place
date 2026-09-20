@@ -277,6 +277,48 @@ const pastLabel: Shape = {
   text: "PAST",
 };
 
+function emptyWorld(): World {
+  return {
+    id: "w1",
+    name: "Empty",
+    createdAt: "2020-01-01T00:00:00.000Z",
+    places: [],
+    strata: [],
+    currentStratumId: null,
+    entries: [],
+  };
+}
+
+describe("MapCanvas walk anchor emphasis", () => {
+  it("marks the empty CTA as the walk target on the draw step", () => {
+    render(<MapCanvas world={emptyWorld()} walkAnchor="draw" />);
+    const cta = screen.getByRole("button", { name: copy.map.empty.action });
+    expect(cta).toHaveAttribute("data-walk-anchor", "draw");
+  });
+
+  it("marks the marker layer as the walk target on the recall step", () => {
+    const { container } = render(
+      <MapCanvas
+        world={worldWithPlace()}
+        walkAnchor="recall"
+        onPickPlace={vi.fn()}
+      />,
+    );
+    expect(
+      container.querySelector('.map-markers[data-walk-anchor="recall"]'),
+    ).not.toBeNull();
+  });
+
+  it("adds no walk-anchor hook when the prop is unset", () => {
+    const { container } = render(<MapCanvas world={emptyWorld()} />);
+    expect(container.querySelector("[data-walk-anchor]")).toBeNull();
+    // The empty CTA still renders exactly as before.
+    expect(
+      screen.getByRole("button", { name: copy.map.empty.action }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("MapCanvas viewed-shapes (read-only past)", () => {
   it("renders the viewed snapshot, not the current stratum's shapes", () => {
     render(
