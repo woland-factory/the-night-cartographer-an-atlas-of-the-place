@@ -4,8 +4,10 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { copy } from "../copy";
 import type { Entry } from "../model/atlas";
+import { buildRecallIndex } from "../model/recallIndex";
 import type { PlaceRecall } from "../model/recallIndex";
-import { RecallPanel } from "./RecallPanel";
+import { stressWorld } from "../test/fixtures";
+import { RECALL_PAGE, RecallPanel } from "./RecallPanel";
 
 function entry(id: string, date: string, body: string): Entry {
   return {
@@ -37,6 +39,19 @@ const twoEntries = () =>
     entry("e2", "2021-05-11", "Same bench, older gulls."),
     entry("e1", "2019-11-02", "The tide was out."),
   ]);
+
+// A busy place: `count` distinct dated entries, newest-first, so the cap and
+// its reveal can be exercised. Day n maps to a real YYYY-MM-DD.
+function manyEntries(count: number): Entry[] {
+  const out: Entry[] = [];
+  for (let i = 0; i < count; i++) {
+    const day = new Date(Date.UTC(2010, 0, 1 + (count - 1 - i)))
+      .toISOString()
+      .slice(0, 10);
+    out.push(entry(`e${count - 1 - i}`, day, `dream ${count - 1 - i}`));
+  }
+  return out; // already newest-first (i=0 is the latest day)
+}
 
 function renderPanel(
   recall: PlaceRecall,
@@ -163,6 +178,75 @@ describe("RecallPanel", () => {
     fireEvent.keyDown(panel, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(opener).toHaveFocus();
+  });
+
+  it("caps the rendered list at RECALL_PAGE and shows the true total plus a reveal", () => {
+    const total = RECALL_PAGE + 80;
+    renderPanel(recallWith(manyEntries(total)));
+    const panel = screen.getByRole("dialog");
+
+    // Only a page of entries renders, but the count line stays honest.
+    expect(within(panel).getAllByRole("listitem")).toHaveLength(RECALL_PAGE);
+    expect(within(panel).getByText(`${total} visits`)).toBeInTheDocument();
+
+    // The reveal is present, subordinate (a ghost, not the primary), and lives
+    // inside the dialog so it is reachable under the focus trap.
+    const reveal = within(panel).getByRole("button", {
+      name: copy.recall.showEarlier,
+    });
+    expect(reveal).toHaveClass("btn--ghost");
+    expect(reveal).not.toHaveClass("btn--primary");
+
+    // One primary action only: "Write a dream here". The reveal is subordinate.
+    expect(panel.querySelectorAll(".btn--primary")).toHaveLength(1);
+  });
+
+  it("reveals every earlier visit on demand and then hides the control", async () => {
+    const user = userEvent.setup();
+    const total = RECALL_PAGE + 40;
+    renderPanel(recallWith(manyEntries(total)));
+    const panel = screen.getByRole("dialog");
+
+    await user.click(
+      within(panel).getByRole("button", { name: copy.recall.showEarlier }),
+    );
+
+    expect(within(panel).getAllByRole("listitem")).toHaveLength(total);
+    expect(
+      within(panel).queryByRole("button", { name: copy.recall.showEarlier }),
+    ).toBeNull();
+  });
+
+  it("shows no reveal when the history fits in one page", () => {
+    renderPanel(recallWith(manyEntries(RECALL_PAGE)));
+    expect(screen.getAllByRole("listitem")).toHaveLength(RECALL_PAGE);
+    expect(
+      screen.queryByRole("button", { name: copy.recall.showEarlier }),
+    ).toBeNull();
+  });
+
+  it("stays instant and complete on the busiest place of a years-deep atlas", async () => {
+    const user = userEvent.setup();
+    // The recall a real tap would produce: an O(1) lookup, no per-tap scan.
+    const index = buildRecallIndex(stressWorld());
+    const recall = index.get("sp0");
+    expect(recall.count).toBeGreaterThan(1000);
+
+    renderPanel(recall);
+    const panel = screen.getByRole("dialog");
+
+    // The answer-back opens bounded: one page, not thousands of nodes.
+    expect(within(panel).getAllByRole("listitem")).toHaveLength(RECALL_PAGE);
+    // The true total is shown, so the answer is honest before the reveal.
+    expect(
+      within(panel).getByText(`${recall.count} visits`),
+    ).toBeInTheDocument();
+
+    // Every earlier morning is still reachable in one tap.
+    await user.click(
+      within(panel).getByRole("button", { name: copy.recall.showEarlier }),
+    );
+    expect(within(panel).getAllByRole("listitem")).toHaveLength(recall.count);
   });
 
   it("keeps a single-column sheet: scrollable body, then the one primary action", () => {
