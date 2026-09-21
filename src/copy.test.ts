@@ -101,7 +101,7 @@ describe("copy sweep", () => {
     checkNoNegative(allProductStrings);
   });
 
-  it("keeps README and ATLAS_FORMAT free of dashes and banned words", () => {
+  it("keeps README and ATLAS_FORMAT free of dashes, banned words, and negative phrasing", () => {
     const readme = readFileSync(resolve(process.cwd(), "README.md"), "utf8");
     const format = readFileSync(
       resolve(process.cwd(), "ATLAS_FORMAT.md"),
@@ -109,5 +109,27 @@ describe("copy sweep", () => {
     );
     checkNoDashes([readme, format]);
     checkNoBanned([readme, format]);
+    checkNoNegative([readme, format]);
+  });
+
+  it("sweeps the user-visible strings in index.html", () => {
+    const html = readFileSync(resolve(process.cwd(), "index.html"), "utf8");
+    const title = html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "";
+    const description =
+      html.match(/name="description"[^>]*content="([^"]*)"/s)?.[1] ??
+      html.match(/content="([^"]*)"[^>]*name="description"/s)?.[1] ??
+      "";
+    const wordmark =
+      html.match(/class="app-shell__wordmark">([^<]*)</)?.[1] ?? "";
+    const tagline =
+      html.match(/class="app-shell__tagline">([^<]*)</)?.[1] ?? "";
+
+    const shellStrings = [title, description, wordmark, tagline];
+    // Guard the extraction itself: an empty match would sweep nothing.
+    for (const s of shellStrings) expect(s.length).toBeGreaterThan(0);
+
+    checkNoDashes(shellStrings);
+    checkNoBanned(shellStrings);
+    checkNoNegative(shellStrings);
   });
 });

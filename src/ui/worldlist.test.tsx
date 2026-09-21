@@ -21,6 +21,13 @@ describe("world list", () => {
     expect(
       screen.getByRole("button", { name: copy.worldList.openSample }),
     ).toBeInTheDocument();
+
+    // One obvious primary action ("New world"); sample and file controls are
+    // visibly subordinate.
+    expect(document.querySelectorAll(".btn--primary")).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: copy.worldList.newWorld }),
+    ).toHaveClass("btn--primary");
   });
 
   it("creates and opens a named world", async () => {
@@ -38,6 +45,9 @@ describe("world list", () => {
     const card = screen.getByRole("button", { name: /Mistral Bay/ });
     expect(card).toBeInTheDocument();
     expect(screen.queryByText(copy.worldList.emptyTitle)).toBeNull();
+
+    // The populated list still leans on one primary action.
+    expect(document.querySelectorAll(".btn--primary")).toHaveLength(1);
 
     // Opening it shows the opened-world view.
     await user.click(card);

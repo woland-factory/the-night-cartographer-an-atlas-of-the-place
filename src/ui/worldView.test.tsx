@@ -257,6 +257,42 @@ describe("WorldView time scrub", () => {
     expect(screen.getByText(copy.walkthrough.write)).toBeInTheDocument();
   });
 
+  it("leans on exactly one primary action with no sheet open", async () => {
+    // The sample world has places and entries, so the world view's single
+    // primary is "Write a dream". The walk's Skip and every other control are
+    // visibly subordinate.
+    await openSampleWorld();
+    expect(document.querySelector(".sheet")).toBeNull();
+    expect(document.querySelectorAll(".btn--primary")).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: copy.composer.open }),
+    ).toHaveClass("btn--primary");
+  });
+
+  it("makes the map CTA the single primary on a brand-new blank world", () => {
+    setConfig({});
+    const world: World = {
+      id: "blank",
+      name: "Blank World",
+      createdAt: "2020-01-01T00:00:00.000Z",
+      places: [],
+      strata: [],
+      currentStratumId: null,
+      entries: [],
+    };
+    render(<WorldView world={world} />);
+
+    // On a blank world "Write a dream" is not shown; the map's own CTA is the
+    // one primary, never both at once.
+    expect(
+      screen.queryByRole("button", { name: copy.composer.open }),
+    ).toBeNull();
+    expect(document.querySelectorAll(".btn--primary")).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: copy.map.empty.action }),
+    ).toHaveClass("btn--primary");
+  });
+
   it("shows the single-point state on a world with one stratum", () => {
     const world: World = {
       id: "w1",
