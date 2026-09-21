@@ -241,6 +241,7 @@ export function WorldView({ world }: { world: World }) {
 
       {view.kind === "recall" && (
         <RecallPanel
+          key={view.placeId}
           recall={index.get(view.placeId)}
           onWriteHere={openCompose}
           onClose={closeSheet}

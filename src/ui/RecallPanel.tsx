@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { copy, visitsLabel } from "../copy";
 import { formatDate } from "../lib/date";
 import { elapsedLabel } from "../lib/elapsed";
@@ -16,6 +16,13 @@ interface RecallPanelProps {
   onClose: () => void;
 }
 
+// The newest entries shown before the reveal. A decade-long atlas can hold
+// thousands of dated entries at one place, so the list is bounded on open
+// (QUALITY BAR §1) while every older morning stays one tap away. Set well
+// above what a real dreamer hits, so the reveal is the long-tail escape hatch,
+// not a routine step.
+export const RECALL_PAGE = 50;
+
 const FOCUSABLE =
   'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])';
 
@@ -24,6 +31,12 @@ export function RecallPanel({ recall, onWriteHere, onClose }: RecallPanelProps) 
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const openerRef = useRef<Element | null>(null);
+
+  // Reveal the long tail on demand. The panel remounts per place (keyed by
+  // place id in WorldView), so this starts false for every newly tapped place.
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? recall.entries : recall.entries.slice(0, RECALL_PAGE);
+  const hiddenCount = recall.count - shown.length;
 
   // Elapsed labels are computed at render, never stored, so they stay true
   // however long the atlas lives.
@@ -102,7 +115,7 @@ export function RecallPanel({ recall, onWriteHere, onClose }: RecallPanelProps) 
               </p>
               <p className="card__meta">{visitsLabel(recall.count)}</p>
               <ol className="recall-entries">
-                {recall.entries.map((entry) => (
+                {shown.map((entry) => (
                   <li className="entry" key={entry.id}>
                     <p className="entry__date">{formatDate(entry.date)}</p>
                     <p className="entry__elapsed">
@@ -112,6 +125,15 @@ export function RecallPanel({ recall, onWriteHere, onClose }: RecallPanelProps) 
                   </li>
                 ))}
               </ol>
+              {hiddenCount > 0 && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--block"
+                  onClick={() => setShowAll(true)}
+                >
+                  {copy.recall.showEarlier}
+                </button>
+              )}
             </>
           ) : (
             <div className="recall-empty">

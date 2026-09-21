@@ -119,6 +119,7 @@ export const copy = {
   recall: {
     close: "Close",
     writeHere: "Write a dream here",
+    showEarlier: "Show earlier visits",
     emptyTitle: "The first dream goes here.",
     emptyBody: "Pin a morning to this place. It remembers from then on.",
     ledgerHeading: "Places",
