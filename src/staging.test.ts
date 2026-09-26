@@ -49,6 +49,15 @@ describe("staging compose (deploy contract)", () => {
     expect(compose).toContain("healthcheck:");
     expect(compose).toMatch(/target:\s*serve/);
   });
+
+  it("probes the healthcheck over 127.0.0.1, never localhost", () => {
+    const healthLine = compose
+      .split("\n")
+      .find((line) => line.includes("wget") && line.includes("http://"));
+    expect(healthLine).toBeDefined();
+    expect(healthLine).toContain("http://127.0.0.1/");
+    expect(healthLine).not.toContain("localhost");
+  });
 });
 
 describe("Dockerfile", () => {
